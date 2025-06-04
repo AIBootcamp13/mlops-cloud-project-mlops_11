@@ -1,0 +1,94 @@
+# MLOps 프로젝트 Docker Compose - 개발환경 (Windows 호환)
+
+services:
+  # 메인 개발 환경
+  dev:
+    platform: linux/amd64  # Windows에서 Linux 컨테이너 명시
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      platforms:
+        - linux/amd64
+    container_name: mlops-dev
+    env_file:
+      - .env  # .env 파일 직접 로드
+    volumes:
+      - .:/app
+      - mlops-data:/app/data
+      - mlops-logs:/app/logs
+    environment:
+      - PYTHONPATH=/app/src
+      - PYTHON_VERSION=3.11
+      - TMDB_API_KEY=${TMDB_API_KEY}
+      - LOG_LEVEL=DEBUG
+    ports:
+      - "8888:8888"  # Jupyter
+      - "8000:8000"  # 웹서버
+    networks:
+      - mlops-network
+    tty: true
+    stdin_open: true
+
+  # Jupyter Notebook 서비스
+  jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: mlops-jupyter
+    command: >
+      bash -c "
+        pip install jupyter &&
+        jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password=''
+      "
+    volumes:
+      - .:/app
+      - mlops-data:/app/data
+    environment:
+      - PYTHONPATH=/app/src
+      - TMDB_API_KEY=${TMDB_API_KEY}
+    ports:
+      - "8889:8888"
+    networks:
+      - mlops-network
+    profiles:
+      - jupyter
+
+  # 데이터베이스 (선택사항)
+  postgres:
+    image: postgres:13
+    container_name: mlops-postgres
+    environment:
+      POSTGRES_DB: mlops
+      POSTGRES_USER: mlops_user
+      POSTGRES_PASSWORD: mlops_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - mlops-network
+    profiles:
+      - database
+
+  # Redis (캐싱/메시지 큐용, 선택사항)
+  redis:
+    image: redis:7-alpine
+    container_name: mlops-redis
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - mlops-network
+    profiles:
+      - cache
+
+volumes:
+  mlops-data:
+  mlops-logs:
+  postgres-data:
+  redis-data:
+
+networks:
+  mlops-network:
+    driver: bridge

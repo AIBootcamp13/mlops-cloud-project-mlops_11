@@ -1,0 +1,42 @@
+# MLOps 프로젝트 - 개발환경 Docker 이미지
+FROM python:3.11-slim
+
+# 메타데이터
+LABEL maintainer="MLOps Project Team"
+LABEL version="1.0.0"
+LABEL description="MLOps Cloud Project - Development Environment"
+
+# 환경변수 설정
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONPATH=/app/src
+
+# 작업 디렉토리 설정
+WORKDIR /app
+
+# 시스템 패키지 업데이트 및 필수 도구 설치
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    vim \
+    htop \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python 의존성 파일 복사
+COPY requirements.txt requirements-dev.txt ./
+
+# Python 패키지 설치
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements-dev.txt
+
+# 애플리케이션 코드 복사
+COPY . .
+
+# 필요한 디렉토리 생성
+RUN mkdir -p data/raw data/processed data/test logs reports
+
+# 개발용 포트 노출 (Jupyter, 웹서버 등)
+EXPOSE 8000 8888 8080
+
+# 개발 환경 진입점
+CMD ["bash"]
