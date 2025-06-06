@@ -1,0 +1,19 @@
+{
+  "test_date": "2025-06-05T01:49:05.090186",
+  "test_results": {
+    "environment": true,
+    "rate_limiter": true,
+    "response_parsing": true,
+    "api_connection": false,
+    "integration": false
+  },
+  "summary": {
+    "total_tests": 5,
+    "passed_tests": 3,
+    "failed_tests": 2,
+    "success_rate": 60.0
+  },
+  "recommendations": [
+    "TMDB API 키를 확인하고 네트워크 연결을 점검하세요."
+  ]
+}

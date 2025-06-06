@@ -1,0 +1,19 @@
+{
+  "movies": [
+    {
+      "id": 1,
+      "title": "Integration Test Movie 1",
+      "vote_average": 8.0
+    },
+    {
+      "id": 2,
+      "title": "Integration Test Movie 2",
+      "vote_average": 7.5
+    }
+  ],
+  "test_metadata": {
+    "test_type": "integration",
+    "timestamp": "20250604_161628",
+    "validation_rate": 66.66666666666666
+  }
+}

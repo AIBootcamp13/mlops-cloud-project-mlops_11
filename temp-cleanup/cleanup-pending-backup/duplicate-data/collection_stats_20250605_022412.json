@@ -1,0 +1,12 @@
+{
+  "start_time": "2025-06-05 02:24:09.439370",
+  "total_pages": 5,
+  "total_movies": 100,
+  "unique_movies": 100,
+  "failed_requests": 0,
+  "api_errors": 0,
+  "processing_errors": 0,
+  "end_time": "2025-06-05 02:24:12.133727",
+  "duration": 2.694357,
+  "average_rate": 2226.8763938854427
+}
