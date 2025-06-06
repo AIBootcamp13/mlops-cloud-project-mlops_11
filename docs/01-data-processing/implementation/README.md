@@ -1,3 +1,33 @@
+---
+title: "데이터 처리 구현 가이드"
+description: "MLOps 데이터 처리 시스템의 구체적인 구현 방법과 기술적 가이드를 제공"
+stage: "01-data-processing"
+phase: "implementation"
+category: "implementation-index"
+difficulty: "intermediate"
+estimated_time: "40-60 hours"
+tags:
+  - implementation-guide
+  - data-processing
+  - mlops-pipeline
+  - comprehensive-guide
+  - step-by-step
+authors:
+  - mlops-team
+last_updated: "2025-06-06"
+version: "1.0"
+status: "active"
+prerequisites:
+  - "WSL Ubuntu 24.04"
+  - "Docker"
+  - "Python 3.11"
+  - "Linux 기본 명령어"
+related_docs:
+  - "../1.data-processing-implementation-guide.md"
+  - "../testing/2.comprehensive-testing-guide.md"
+  - "../../02-feature-store/"
+---
+
 # 데이터 처리 구현 가이드
 
 이 폴더는 MLOps 데이터 처리 시스템의 구체적인 구현 방법과 기술적 가이드를 제공합니다.

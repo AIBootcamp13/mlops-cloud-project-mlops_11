@@ -1,3 +1,31 @@
+---
+title: "데이터 처리 테스팅 가이드"
+description: "1단계 데이터 처리 시스템의 테스트 방법론과 검증 절차를 제공"
+stage: "01-data-processing"
+phase: "testing"
+category: "testing-index"
+difficulty: "intermediate"
+estimated_time: "10-15 hours"
+tags:
+  - testing-guide
+  - system-validation
+  - integration-testing
+  - quality-assurance
+  - verification
+authors:
+  - mlops-team
+last_updated: "2025-06-06"
+version: "1.0"
+status: "active"
+prerequisites:
+  - "구현 단계 완료"
+  - "테스트 개념 이해"
+related_docs:
+  - "../1.data-processing-implementation-guide.md"
+  - "../implementation/"
+  - "2.comprehensive-testing-guide.md"
+---
+
 # 데이터 처리 테스팅 가이드
 
 이 폴더는 데이터 처리 시스템의 테스팅, 검증, 품질 보증 방법을 제공합니다.
