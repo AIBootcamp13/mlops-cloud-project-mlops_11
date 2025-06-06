@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "docs/03-version-control/git-workflow/git-fork-pr-workflow-guide.md",
+                "file": "docs/03-version-control/implementation/3.1-wsl-docker-git-setup.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "git-fork-pr-workflow-guide"
+              "title": "3.1-wsl-docker-git-setup"
             }
           }
         ]
@@ -78,7 +78,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 258.5
+    "width": 315.5
   },
   "right": {
     "id": "7b27d8e1a20fed1f",
@@ -170,40 +170,41 @@
   },
   "active": "7541b4e3f703d5de",
   "lastOpenFiles": [
-    "docs/03-version-control/1.version-control-implementation-guide.md",
-    "docs/03-version-control/git-workflow/git-fork-pr-workflow-guide.html",
-    "docs/03-version-control/git-workflow/git-fork-pr-workflow-guide.md",
-    "docs/01-data-processing/implementation-reports/1.1-data-source-connection/implementation-complete.md",
-    "docs/01-data-processing/1.1-data-source-connection-wsl-ubuntu-guide.md",
-    "docs/01-data-processing/1.data-processing-implementation-guide.md",
-    "add-powershell7-context-menu-with-terminal.reg",
-    "add-powershell7-context-menu-fixed.reg",
-    "remove-powershell7-context-menu.reg",
-    "add-powershell7-context-menu.reg",
-    "reports/tmdb_test_report_20250603_180238.json",
-    "reports/tmdb_test_report_20250603_180137.json",
-    "benchmark_results.txt",
-    "reports/tmdb_test_report_20250603_175628.json",
-    "reports/tmdb_test_report_20250603_175255.json",
-    "README.md",
-    "README_1_1_implementation.md",
-    "docs/08-monitoring/1.monitoring-implementation-guide.md",
-    "docs/06-model-registry/1.model-registry-implementation-guide.md",
-    "docs/09-event-driven/1.event-driven-implementation-guide.md",
-    "docs/00-overview/5.python-requirements-analysis.md",
-    "docs/00-overview/4.detailed-analysis-implementation-plan.md",
-    "docs/00-overview/3.mlops-project-implementation-analysis.md",
-    "docs/00-overview/2.server-architecture.md",
-    "docs/00-overview/1.mlops-house-building-analogy.md",
-    "docs/00-overview/0.mlops-architecture-complete-9stages.md",
-    "docs/00-overview/7.mlops-9-stages-implementation-roadmap.md",
-    "docs/02-feature-store/1.feature-store-implementation-guide.md",
-    "docs/00-overview/6.enterprise-mlops-project-structure.md",
-    "docs/07-model-serving/1.model-serving-implementation-guide.md",
-    "docs/05-workflow-orchestration/1.workflow-orchestration-implementation-guide.md",
-    "docs/04-cicd-pipeline/1.cicd-pipeline-implementation-guide.md",
-    "docs/00-overview/1.mlops-9-stages-implementation-roadmap.md",
-    "docs/00-overview/4-detailed-analysis-implementation-plan.md",
-    "docs/00-overview/server-architecture.md"
+    "docs/03-version-control/implementation/3.5-code-review-guidelines.md",
+    "docs/03-version-control/implementation/3.1-git-workflow-strategy.md",
+    "docs/03-version-control/implementation/3.8-advanced-git-workflows.md",
+    "docs/03-version-control/implementation/3.7-github-repository-setup.md",
+    "docs/03-version-control/implementation/3.6-data-version-management-setup.md",
+    "docs/03-version-control/implementation/3.5-code-quality-tools-configuration.md",
+    "docs/03-version-control/implementation/3.4-pull-request-process-setup.md",
+    "docs/02-feature-store/testing/2.7-complete-verification-checklist.md",
+    "docs/03-version-control/implementation/3.3-commit-convention-implementation.md",
+    "docs/03-version-control/implementation/3.2-branch-strategy-configuration.md",
+    "docs/03-version-control/implementation/3.1-wsl-docker-git-setup.md",
+    "docs/03-version-control/implementation",
+    "docs/03-version-control/새 폴더",
+    "docs/02-feature-store/implementation/2.9-monitoring-system-guide.md",
+    "docs/02-feature-store/implementation/2.8-data-pipeline-automation-guide.md",
+    "setup-docker.sh",
+    "setup-dev.ps1",
+    "setup-docker-feature-store.bat",
+    "setup-docker-feature-store.sh",
+    "temp-cleanup/ROOT_CLEANUP_REPORT.md",
+    "temp-cleanup/setup-docker.sh",
+    "temp-cleanup/setup-docker-feature-store.sh",
+    "temp-cleanup/setup-docker-feature-store.bat",
+    "temp-cleanup/setup-dev.ps1",
+    "temp-cleanup/MANUAL_SETUP_COMMANDS.md",
+    "docs/02-feature-store/testing/2.6-monitoring-testing.md",
+    "docs/02-feature-store/testing/2.5-feast-integration-testing.md",
+    "docs/02-feature-store/testing/2.4-performance-testing.md",
+    "docs/02-feature-store/testing/2.3-api-integration-testing.md",
+    "docs/02-feature-store/testing/2.0-prerequisite-setup.md",
+    "docs/02-feature-store/testing/2.2-core-component-testing.md",
+    "docs/02-feature-store/testing/2.1-environment-setup-testing.md",
+    "MANUAL_SETUP_COMMANDS.md",
+    "docs/02-feature-store/testing/README.md",
+    "temp-cleanup/CLEANUP_SUMMARY.md",
+    "temp-cleanup/cleanup-pending-backup/docs-01-data-processing-implementation-reports/file-creation-guide.md"
   ]
 }
