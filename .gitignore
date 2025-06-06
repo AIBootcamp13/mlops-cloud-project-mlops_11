@@ -179,3 +179,6 @@ Thumbs.db
 *.crt
 credentials.json
 service-account.json
+
+# Obsidian
+.obsidian/

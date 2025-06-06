@@ -26,12 +26,19 @@ from data_processing.rate_limiter import RateLimiter, RateLimitConfig
 
 def setup_logging():
     """로깅 설정"""
+    # logs 디렉토리 생성
+    log_dir = project_root / 'logs'
+    log_dir.mkdir(exist_ok=True)
+    
+    # 로그 파일 경로를 logs 디렉토리로 설정
+    log_file = log_dir / 'test_tmdb_integration.log'
+    
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
             logging.StreamHandler(),
-            logging.FileHandler('test_tmdb_integration.log', encoding='utf-8')
+            logging.FileHandler(str(log_file), encoding='utf-8')
         ]
     )
     return logging.getLogger(__name__)

@@ -30,10 +30,23 @@ class TMDBAPIConnector:
             region: 지역 코드 (기본값: KR)
             language: 언어 코드 (기본값: ko-KR)
         """
+        # 로깅 설정 (초기 단계에서 설정)
+        self.logger = logging.getLogger(__name__)
+        
+        # 환경변수 강제 로드
+        self._ensure_valid_api_key()
+        
         # API 키 설정 (환경변수 우선)
         self.api_key = api_key or os.getenv('TMDB_API_KEY')
+        
+        # API 키 검증
         if not self.api_key:
             raise ValueError("TMDB API 키가 필요합니다. 환경변수 TMDB_API_KEY를 설정하거나 직접 전달해주세요.")
+        
+        if 'your_' in self.api_key.lower() or 'here' in self.api_key.lower():
+            raise ValueError(f"잘못된 API 키입니다: {self.api_key}. 실제 TMDB API 키를 설정해주세요.")
+        
+        self.logger.info(f"TMDB API 키 로드 완료: {self.api_key[:8]}...")
         
         # 기본 설정
         self.base_url = "https://api.themoviedb.org/3"
@@ -45,15 +58,30 @@ class TMDBAPIConnector:
         self.max_retries = 3
         self.timeout = 30
         
-        # 로깅 설정
-        self.logger = logging.getLogger(__name__)
-        
         # 세션 설정 (연결 풀링 및 재시도 로직)
         self.session = self._create_session()
         
         # API 사용량 추적
         self.request_count = 0
         self.last_request_time = 0
+        
+    def _ensure_valid_api_key(self):
+        """환경변수에서 올바른 API 키 로드 보장"""
+        try:
+            from .environment_manager import EnvironmentManager
+            env_manager = EnvironmentManager()
+            # 환경변수 강제 로드 수행
+        except Exception as e:
+            # 환경변수 매니저 로드 실패 시 백업 방법
+            import os
+            from dotenv import load_dotenv
+            
+            # 플레이스홀더 값 제거
+            if os.getenv('TMDB_API_KEY') and 'your_' in os.getenv('TMDB_API_KEY', '').lower():
+                os.environ.pop('TMDB_API_KEY', None)
+            
+            # .env 파일에서 강제 로드
+            load_dotenv(override=True)
         
     def _create_session(self) -> requests.Session:
         """
@@ -255,6 +283,102 @@ class TMDBAPIConnector:
         
         endpoint = f'/3/trending/movie/{time_window}'
         return self._make_request(endpoint)
+    
+    def get_movies_by_genre(self, genre_id: int, page: int = 1) -> Dict[str, Any]:
+        """
+        장르별 영화 조회
+        
+        Args:
+            genre_id: 장르 ID
+            page: 페이지 번호
+            
+        Returns:
+            장르별 영화 데이터
+        """
+        params = {
+            'with_genres': genre_id,
+            'page': page,
+            'sort_by': 'popularity.desc'
+        }
+        return self._make_request('/3/discover/movie', params)
+    
+    def get_latest_movies(self, page: int = 1) -> Dict[str, Any]:
+        """
+        최신 개봉 영화 조회
+        
+        Args:
+            page: 페이지 번호
+            
+        Returns:
+            최신 영화 데이터
+        """
+        from datetime import datetime, timedelta
+        
+        # 최근 3개월 내 개봉 영화
+        end_date = datetime.now().strftime('%Y-%m-%d')
+        start_date = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
+        
+        params = {
+            'primary_release_date.gte': start_date,
+            'primary_release_date.lte': end_date,
+            'page': page,
+            'sort_by': 'primary_release_date.desc'
+        }
+        return self._make_request('/3/discover/movie', params)
+    
+    def get_top_rated_movies(self, page: int = 1) -> Dict[str, Any]:
+        """
+        평점 높은 영화 조회
+        
+        Args:
+            page: 페이지 번호
+            
+        Returns:
+            평점 높은 영화 데이터
+        """
+        params = {'page': page}
+        return self._make_request('/3/movie/top_rated', params)
+    
+    def save_collection_results(self, movies: List[Dict], collection_type: str, metadata: Dict) -> str:
+        """
+        수집 결과 저장
+        
+        Args:
+            movies: 수집된 영화 데이터 리스트
+            collection_type: 수집 유형
+            metadata: 메타데이터
+            
+        Returns:
+            저장된 파일 경로
+        """
+        from pathlib import Path
+        
+        # 데이터 저장 디렉토리 생성
+        data_dir = Path('data/raw/movies')
+        data_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 파일명 생성
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"{collection_type}_{timestamp}.json"
+        filepath = data_dir / filename
+        
+        # 저장할 데이터 구성
+        result_data = {
+            'movies': movies,
+            'collection_info': {
+                **metadata,
+                'collection_timestamp': datetime.now().isoformat(),
+                'total_movies': len(movies),
+                'api_requests_used': self.request_count
+            }
+        }
+        
+        # JSON 파일로 저장
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(result_data, f, ensure_ascii=False, indent=2, default=str)
+        
+        self.logger.info(f"수집 결과 저장 완료: {filepath}")
+        return str(filepath)
     
     def get_api_usage_stats(self) -> Dict[str, Any]:
         """
