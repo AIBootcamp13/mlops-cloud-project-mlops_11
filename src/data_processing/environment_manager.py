@@ -43,15 +43,37 @@ class EnvironmentManager:
         self._load_environment()
     
     def _load_environment(self):
-        """환경변수 로드"""
+        """환경변수 로드 (.env 파일 우선)"""
         try:
             if os.path.exists(self.env_file):
-                load_dotenv(self.env_file)
+                # 기존 환경변수에서 플레이스홀더 값 제거
+                placeholder_keys = [
+                    'TMDB_API_KEY',
+                    'DB_PASSWORD', 
+                    'OPENAI_API_KEY'
+                ]
+                
+                for key in placeholder_keys:
+                    current_value = os.getenv(key)
+                    if current_value and ('your_' in current_value.lower() or 'here' in current_value.lower()):
+                        os.environ.pop(key, None)
+                        self.logger.info(f"플레이스홀더 환경변수 제거: {key}")
+                
+                # .env 파일에서 강제 로드
+                load_dotenv(self.env_file, override=True)
+                
+                # 로드 후 재검증
+                api_key = os.getenv('TMDB_API_KEY')
+                if api_key and ('your_' in api_key.lower() or 'here' in api_key.lower()):
+                    self.logger.error(f"잘못된 API 키가 로드됨: {api_key}")
+                    raise ValueError("TMDB_API_KEY에 올바른 API 키를 설정해주세요.")
+                
                 self.logger.info(f"환경변수 파일 로드 완료: {self.env_file}")
             else:
                 self.logger.warning(f"환경변수 파일을 찾을 수 없습니다: {self.env_file}")
         except Exception as e:
             self.logger.error(f"환경변수 로드 실패: {e}")
+            raise
     
     def get_env(self, key: str, default: Any = None, required: bool = False, 
                 env_type: type = str) -> Any:
