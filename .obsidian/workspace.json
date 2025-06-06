@@ -182,6 +182,10 @@
   },
   "active": "7541b4e3f703d5de",
   "lastOpenFiles": [
+    "BUGFIX_REPORT.md",
+    "experiments/hyperparameter-optimization/experiment_config.json",
+    "experiments/hyperparameter-optimization",
+    "experiments",
     "docs/03-version-control/PROGRESS.md",
     "docs/03-version-control/implementation/3.2-branch-strategy-configuration.md",
     "docs/03-version-control/implementation/3.1-integrated-git-workflow-wsl-docker.md",
@@ -207,16 +211,12 @@
     "setup-docker-feature-store.bat",
     "setup-docker-feature-store.sh",
     "temp-cleanup/ROOT_CLEANUP_REPORT.md",
-    "temp-cleanup/setup-docker.sh",
-    "temp-cleanup/setup-docker-feature-store.sh",
-    "temp-cleanup/setup-docker-feature-store.bat",
     "temp-cleanup/MANUAL_SETUP_COMMANDS.md",
     "docs/02-feature-store/testing/2.6-monitoring-testing.md",
     "docs/02-feature-store/testing/2.5-feast-integration-testing.md",
     "docs/02-feature-store/testing/2.4-performance-testing.md",
     "docs/02-feature-store/testing/2.3-api-integration-testing.md",
     "docs/02-feature-store/testing/2.0-prerequisite-setup.md",
-    "docs/02-feature-store/testing/2.2-core-component-testing.md",
-    "docs/02-feature-store/testing/2.1-environment-setup-testing.md"
+    "docs/02-feature-store/testing/2.2-core-component-testing.md"
   ]
 }
