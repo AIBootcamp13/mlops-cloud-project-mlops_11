@@ -1,0 +1,276 @@
+# ==============================================================================
+# Movie MLOps - Monitoring & Event Streaming Stack
+# 
+# 포함 서비스:
+# - 모니터링: Prometheus (메트릭 수집), Grafana (대시보드)
+# - 이벤트: Kafka + Zookeeper (스트리밍), Kafka UI (관리)
+# - 메트릭: Node Exporter (시스템), cAdvisor (컨테이너)
+# - 알림: AlertManager (알림 관리)
+#
+# 실행: docker compose -f docker/stacks/docker-compose.monitoring.yml up -d
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # =============================================================================
+  # 메트릭 수집 및 모니터링
+  # =============================================================================
+  
+  # Prometheus - 메트릭 수집 엔진
+  prometheus:
+    image: ${PROMETHEUS_IMAGE:-prom/prometheus:v2.48.0}
+    container_name: movie-mlops-prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./docker/configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+      - '--web.enable-remote-write-receiver'
+    networks:
+      - movie-mlops-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Grafana - 대시보드 및 시각화
+  grafana:
+    image: ${GRAFANA_IMAGE:-grafana/grafana:10.2.0}
+    container_name: movie-mlops-grafana
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin123}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-worldmap-panel
+      - GF_RENDERING_SERVER_URL=http://renderer:8081/render
+      - GF_RENDERING_CALLBACK_URL=http://grafana:3000/
+      - GF_LOG_FILTERS=rendering:debug
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/configs/grafana/provisioning:/etc/grafana/provisioning
+      - ./docker/configs/grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - movie-mlops-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # 시스템 메트릭 수집
+  # =============================================================================
+  
+  # Node Exporter - 호스트 시스템 메트릭
+  node-exporter:
+    image: prom/node-exporter:v1.6.1
+    container_name: movie-mlops-node-exporter
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+      - '--collector.netdev.device-exclude=^(veth.*|docker.*|br-.*)$$'
+    networks:
+      - movie-mlops-network
+    restart: unless-stopped
+
+  # cAdvisor - 컨테이너 메트릭
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.0
+    container_name: movie-mlops-cadvisor
+    ports:
+      - "8081:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    devices:
+      - /dev/kmsg
+    networks:
+      - movie-mlops-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # 이벤트 스트리밍 시스템
+  # =============================================================================
+  
+  # Zookeeper - Kafka 코디네이션 서비스
+  zookeeper:
+    image: ${ZOOKEEPER_IMAGE:-confluentinc/cp-zookeeper:7.5.0}
+    container_name: movie-mlops-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_PORT:-2181}
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+    networks:
+      - movie-mlops-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "echo", "ruok", "|", "nc", "localhost", "2181", "|", "grep", "imok"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Kafka - 이벤트 스트리밍 플랫폼
+  kafka:
+    image: ${KAFKA_IMAGE:-confluentinc/cp-kafka:7.5.0}
+    container_name: movie-mlops-kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "${KAFKA_PORT:-9092}:9092"
+      - "${KAFKA_INTERNAL_PORT:-29092}:29092"
+    environment:
+      KAFKA_BROKER_ID: ${KAFKA_BROKER_ID:-1}
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: ${KAFKA_AUTO_CREATE_TOPICS_ENABLE:-true}
+      KAFKA_DELETE_TOPIC_ENABLE: 'true'
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_RETENTION_BYTES: 1073741824
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - movie-mlops-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Kafka UI - Kafka 관리 웹 인터페이스
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: movie-mlops-kafka-ui
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8082:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: ${COMPOSE_PROJECT_NAME:-movie-mlops}-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      DYNAMIC_CONFIG_ENABLED: 'true'
+    networks:
+      - movie-mlops-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # 알림 및 경고 시스템
+  # =============================================================================
+  
+  # AlertManager - 알림 관리 시스템
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: movie-mlops-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./docker/configs/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+      - '--cluster.advertise-address=0.0.0.0:9093'
+    networks:
+      - movie-mlops-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # 추가 도구들
+  # =============================================================================
+  
+  # Blackbox Exporter - 외부 서비스 모니터링
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.24.0
+    container_name: movie-mlops-blackbox-exporter
+    ports:
+      - "9115:9115"
+    volumes:
+      - ./docker/configs/blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml
+    networks:
+      - movie-mlops-network
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/blackbox_exporter/config.yml'
+
+# =============================================================================
+# 네트워크 및 볼륨
+# =============================================================================
+
+networks:
+  movie-mlops-network:
+    driver: bridge
+    external: true
+
+volumes:
+  # 모니터링 데이터
+  prometheus_data:
+    name: movie-mlops-prometheus-data
+  grafana_data:
+    name: movie-mlops-grafana-data
+  alertmanager_data:
+    name: movie-mlops-alertmanager-data
+  
+  # 이벤트 스트리밍 데이터
+  kafka_data:
+    name: movie-mlops-kafka-data
+  zookeeper_data:
+    name: movie-mlops-zookeeper-data
+  zookeeper_logs:
+    name: movie-mlops-zookeeper-logs

@@ -1,0 +1,99 @@
+# ==============================================================================
+# Docker 빌드 최적화용 .dockerignore
+# WSL Docker 환경에서 빌드 성능 향상
+# ==============================================================================
+
+# Git 관련
+.git/
+.github/
+.gitignore
+
+# Python 관련
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 가상환경
+venv/
+env/
+ENV/
+.venv/
+
+# IDE 설정
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS 관련
+.DS_Store
+Thumbs.db
+
+# 로그 및 임시 파일
+*.log
+logs/
+tmp/
+temp/
+
+# 테스트 관련
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# 개발 도구
+.mypy_cache/
+.black/
+.flake8/
+
+# 문서 관련
+docs/_build/
+*.pdf
+*.docx
+
+# 데이터 파일 (큰 파일들)
+data/raw/
+data/external/
+*.csv
+*.json
+*.zip
+*.tar.gz
+
+# 모델 파일
+models/trained/
+models/deployed/
+*.pkl
+*.model
+*.h5
+
+# Obsidian
+.obsidian/
+
+# 환경 설정 (보안)
+.env.local
+.env.production
+
+# Node.js (프론트엔드)
+node_modules/
+npm-debug.log*
+
+# WSL 관련
+.wsl/
