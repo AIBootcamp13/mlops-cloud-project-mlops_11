@@ -27,12 +27,19 @@ scrape_configs:
     static_configs:
       - targets: ['cadvisor:8080']
 
-  # FastAPI 애플리케이션
+  # FastAPI 애플리케이션 (메인 API)
   - job_name: 'movie-mlops-api'
     static_configs:
       - targets: ['api:8000']
     metrics_path: '/metrics'
     scrape_interval: 5s
+
+  # FastAPI 헬스체크
+  - job_name: 'movie-mlops-api-health'
+    static_configs:
+      - targets: ['api:8000']
+    metrics_path: '/metrics/health'
+    scrape_interval: 10s
 
   # MLflow
   - job_name: 'mlflow'

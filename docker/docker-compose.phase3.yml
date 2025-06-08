@@ -1,0 +1,269 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database (공통)
+  postgres:
+    image: postgres:15
+    container_name: movie-mlops-postgres
+    environment:
+      POSTGRES_DB: movie_mlops
+      POSTGRES_USER: mlops_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mlops_password}
+      POSTGRES_MULTIPLE_DATABASES: airflow,mlflow,feast
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/configs/postgres/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - mlops-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mlops_user -d movie_mlops"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis (Feast Online Store & Airflow Celery)
+  redis:
+    image: redis:7-alpine
+    container_name: movie-mlops-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - mlops-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MLflow Server
+  mlflow:
+    build:
+      context: .
+      dockerfile: docker/dockerfiles/Dockerfile.mlflow
+    container_name: movie-mlops-mlflow
+    ports:
+      - "5000:5000"
+    environment:
+      MLFLOW_BACKEND_STORE_URI: postgresql://mlops_user:${POSTGRES_PASSWORD:-mlops_password}@postgres:5432/mlflow
+      MLFLOW_DEFAULT_ARTIFACT_ROOT: /app/data/mlflow/artifacts
+      MLFLOW_HOST: 0.0.0.0
+      MLFLOW_PORT: 5000
+    volumes:
+      - ./data/mlflow:/app/data/mlflow
+      - ./logs/mlflow:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - mlops-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Feast Feature Server
+  feast:
+    build:
+      context: .
+      dockerfile: docker/dockerfiles/Dockerfile.feast
+    container_name: movie-mlops-feast
+    ports:
+      - "6566:6566"
+    environment:
+      FEAST_REPO_PATH: /app/feast_repo
+      PYTHONPATH: /app
+    volumes:
+      - ./feast_repo:/app/feast_repo
+      - ./data/feast:/app/data/feast
+      - ./data/processed:/app/data/processed
+      - ./src:/app/src
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - mlops-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6566/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PyTorch Training Service
+  pytorch-trainer:
+    build:
+      context: .
+      dockerfile: docker/dockerfiles/Dockerfile.pytorch
+    container_name: movie-mlops-pytorch
+    environment:
+      PYTHONPATH: /app
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      CUDA_VISIBLE_DEVICES: ${CUDA_VISIBLE_DEVICES:-}
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./logs:/app/logs
+      - ./feast_repo:/app/feast_repo
+    depends_on:
+      mlflow:
+        condition: service_healthy
+      feast:
+        condition: service_healthy
+    networks:
+      - mlops-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    profiles:
+      - training
+
+  # FastAPI Application
+  api:
+    build:
+      context: .
+      dockerfile: docker/dockerfiles/Dockerfile.api
+    container_name: movie-mlops-api
+    ports:
+      - "8000:8000"
+    environment:
+      PYTHONPATH: /app
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      FEAST_REPO_PATH: /app/feast_repo
+      DATABASE_URL: postgresql://mlops_user:${POSTGRES_PASSWORD:-mlops_password}@postgres:5432/movie_mlops
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./feast_repo:/app/feast_repo
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+      feast:
+        condition: service_healthy
+    networks:
+      - mlops-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Airflow Webserver
+  airflow-webserver:
+    build:
+      context: .
+      dockerfile: docker/dockerfiles/Dockerfile.airflow
+    container_name: movie-mlops-airflow-webserver
+    ports:
+      - "8080:8080"
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://mlops_user:${POSTGRES_PASSWORD:-mlops_password}@postgres:5432/airflow
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: true
+      AIRFLOW__CORE__LOAD_EXAMPLES: false
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: true
+      AIRFLOW__WEBSERVER__RBAC: false
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      PYTHONPATH: /app
+    volumes:
+      - ./airflow/dags:/app/airflow/dags
+      - ./src:/app/src
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./feast_repo:/app/feast_repo
+      - ./logs/airflow:/app/logs/airflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+    networks:
+      - mlops-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Airflow Scheduler
+  airflow-scheduler:
+    build:
+      context: .
+      dockerfile: docker/dockerfiles/Dockerfile.airflow
+    container_name: movie-mlops-airflow-scheduler
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://mlops_user:${POSTGRES_PASSWORD:-mlops_password}@postgres:5432/airflow
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: true
+      AIRFLOW__CORE__LOAD_EXAMPLES: false
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      PYTHONPATH: /app
+    volumes:
+      - ./airflow/dags:/app/airflow/dags
+      - ./src:/app/src
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./feast_repo:/app/feast_repo
+      - ./logs/airflow:/app/logs/airflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+    networks:
+      - mlops-network
+    command: ["airflow", "scheduler"]
+
+  # Jupyter Notebook (개발용)
+  jupyter:
+    build:
+      context: .
+      dockerfile: docker/dockerfiles/Dockerfile.jupyter
+    container_name: movie-mlops-jupyter
+    ports:
+      - "8888:8888"
+    environment:
+      JUPYTER_ENABLE_LAB: yes
+      JUPYTER_TOKEN: ${JUPYTER_TOKEN:-movie-mlops}
+      PYTHONPATH: /app
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      - ./notebooks:/app/notebooks
+      - ./src:/app/src
+      - ./data:/app/data
+      - ./feast_repo:/app/feast_repo
+    depends_on:
+      mlflow:
+        condition: service_healthy
+      feast:
+        condition: service_healthy
+    networks:
+      - mlops-network
+    profiles:
+      - development
+
+networks:
+  mlops-network:
+    driver: bridge
+    name: movie-mlops-network
+
+volumes:
+  postgres_data:
+    name: movie-mlops-postgres-data
+  redis_data:
+    name: movie-mlops-redis-data
