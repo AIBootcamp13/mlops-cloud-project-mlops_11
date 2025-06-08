@@ -30,6 +30,7 @@ print_menu() {
     echo "1) 전체 환경 설정 (최초 1회)"
     echo "2) 모든 스택 시작 (인프라 + ML + 모니터링)"
     echo "3) 모든 스택 중지"
+    echo "14) 기존 컨테이너 정리"
     echo ""
     echo -e "${BLUE}📦 기능별 스택 관리${NC}"
     echo "4) 인프라 스택 (PostgreSQL + Redis)"
@@ -80,9 +81,12 @@ setup_environment() {
     echo -e "${GREEN}🚀 전체 환경 설정 시작...${NC}"
     
     # 네트워크 생성
-    if ! docker network ls | grep -q "movie-mlops-network"; then
+    if ! docker network inspect movie-mlops-network >/dev/null 2>&1; then
         echo "Docker 네트워크 생성 중..."
         docker network create movie-mlops-network
+        echo "✅ 네트워크 생성 완료"
+    else
+        echo "✅ 네트워크 이미 존재함"
     fi
     
     # 필요한 디렉토리 생성
@@ -98,6 +102,47 @@ setup_environment() {
 start_all_stacks() {
     echo -e "${GREEN}🚀 모든 스택 시작...${NC}"
     
+    # 0. 네트워크 확인 및 생성 (먼저 실행)
+    if ! docker network inspect movie-mlops-network >/dev/null 2>&1; then
+        echo "0️⃣ Docker 네트워크 생성 중..."
+        docker network create movie-mlops-network
+        echo "✅ 네트워크 생성 완료"
+    else
+        echo "0️⃣ 네트워크 이미 존재함 - 건너뜀"
+    fi
+    
+    # 0-1. 기존 컴테이너 정리 (충돌 방지) - 더 첫저한 정리
+    echo "🧹 기존 컴테이너 정리 중..."
+    
+    # 모든 스택의 컴테이너 중지 및 제거
+    echo "단계 1: Docker Compose 스택 중지 중..."
+    docker compose -f docker/stacks/docker-compose.monitoring.yml --project-directory . down 2>/dev/null || true
+    docker compose -f docker/stacks/docker-compose.ml-stack.yml --project-directory . --profile development down 2>/dev/null || true
+    docker compose -f docker/docker-compose.redis.yml down 2>/dev/null || true
+    docker compose -f docker/docker-compose.postgres.yml down 2>/dev/null || true
+    
+    # 개별 컴테이너 중지 및 제거
+    echo "단계 2: 개별 컴테이너 정리 중..."
+    existing_containers=$(docker ps -aq --filter "name=movie-mlops")
+    if [ ! -z "$existing_containers" ]; then
+        echo "기존 movie-mlops 컴테이너를 중지하고 제거합니다..."
+        docker stop $existing_containers 2>/dev/null || true
+        docker rm $existing_containers 2>/dev/null || true
+        echo "✅ 기존 컴테이너 정리 완료"
+    else
+        echo "✅ 정리할 기존 컴테이너 없음"
+    fi
+    
+    # 추가로 오펜 컨테이너 정리 (이름 기반)
+    echo "단계 3: 이름 기반 컴테이너 정리 중..."
+    for container in movie-mlops-postgres movie-mlops-redis movie-mlops-pgadmin movie-mlops-redis-commander; do
+        if docker ps -a --format "{{.Names}}" | grep -q "^${container}$"; then
+            echo "제거 중: ${container}"
+            docker stop "${container}" 2>/dev/null || true
+            docker rm "${container}" 2>/dev/null || true
+        fi
+    done
+    
     # 1. 인프라 스택
     echo "1️⃣ 인프라 스택 시작 중..."
     docker compose -f docker/docker-compose.postgres.yml up -d
@@ -107,13 +152,36 @@ start_all_stacks() {
     echo "인프라 서비스 안정화 대기 중... (15초)"
     sleep 15
     
-    # 2. ML 스택
+    # 2. ML 스택 (인프라 의존성 없는 서비스만)
     echo "2️⃣ ML 스택 시작 중..."
-    docker compose -f docker/stacks/docker-compose.ml-stack.yml up -d
+    
+    # Feast 서버 개별 실행 (안정적 실행을 위해)
+    echo "Feast 서버 시작 중..."
+    docker run -d \
+      --name movie-mlops-feast-new \
+      --network movie-mlops-network \
+      -p 6567:6567 \
+      -v /mnt/c/dev/movie-mlops:/app \
+      movie-mlops-feast \
+      feast serve --host 0.0.0.0 --port 6567
+    
+    # 잠시 대기 (Feast 초기화 시간)
+    echo "Feast 서비스 안정화 대기 중... (5초)"
+    sleep 5
+    
+    # 나머지 ML 서비스들 (MLflow, FastAPI, Jupyter 등) - Feast 제외
+    echo "나머지 ML 서비스 시작 중..."
+    if [ -f "docker/stacks/docker-compose.ml-stack-fixed.yml" ]; then
+        echo "수정된 ML 스택에서 FastAPI, MLflow, Jupyter, Airflow 시작..."
+        docker compose -f docker/stacks/docker-compose.ml-stack-fixed.yml --project-directory . --profile development up -d api mlflow jupyter airflow-webserver airflow-scheduler
+    else
+        echo "기본 ML 스택에서 FastAPI, MLflow, Jupyter, Airflow 시작..."
+        docker compose -f docker/stacks/docker-compose.ml-stack.yml --project-directory . --profile development up -d api mlflow jupyter airflow-webserver airflow-scheduler
+    fi
     
     # 3. 모니터링 스택
     echo "3️⃣ 모니터링 스택 시작 중..."
-    docker compose -f docker/stacks/docker-compose.monitoring.yml up -d
+    docker compose -f docker/stacks/docker-compose.monitoring.yml --project-directory . up -d
     
     echo -e "${GREEN}✅ 모든 스택이 시작되었습니다!${NC}"
     show_service_urls
@@ -123,16 +191,30 @@ stop_all_stacks() {
     echo -e "${RED}🛑 모든 스택 중지...${NC}"
     
     # 역순으로 중지
-    docker compose -f docker/stacks/docker-compose.monitoring.yml down
-    docker compose -f docker/stacks/docker-compose.ml-stack.yml down
-    docker compose -f docker/docker-compose.redis.yml down
-    docker compose -f docker/docker-compose.postgres.yml down
+    docker compose -f docker/stacks/docker-compose.monitoring.yml --project-directory . down 2>/dev/null || true
+    
+    # ML 스택 중지 (수정된 버전 우선 시도)
+    if [ -f "docker/stacks/docker-compose.ml-stack-fixed.yml" ]; then
+        docker compose -f docker/stacks/docker-compose.ml-stack-fixed.yml --project-directory . --profile development down 2>/dev/null || true
+    fi
+    docker compose -f docker/stacks/docker-compose.ml-stack.yml --project-directory . down 2>/dev/null || true
+    
+    docker compose -f docker/docker-compose.redis.yml down 2>/dev/null || true
+    docker compose -f docker/docker-compose.postgres.yml down 2>/dev/null || true
     
     echo -e "${GREEN}✅ 모든 스택이 중지되었습니다.${NC}"
 }
 
 start_infrastructure() {
     echo -e "${GREEN}🏗️ 인프라 스택 시작...${NC}"
+    
+    # 네트워크 확인 및 생성
+    if ! docker network inspect movie-mlops-network >/dev/null 2>&1; then
+        echo "네트워크 생성 중..."
+        docker network create movie-mlops-network
+        echo "✅ 네트워크 생성 완료"
+    fi
+    
     docker compose -f docker/docker-compose.postgres.yml up -d
     docker compose -f docker/docker-compose.redis.yml up -d
     echo -e "${GREEN}✅ 인프라 스택이 시작되었습니다.${NC}"
@@ -142,6 +224,14 @@ start_infrastructure() {
 
 start_api_stack() {
     echo -e "${GREEN}💻 API 스택 시작...${NC}"
+    
+    # 네트워크 확인 및 생성
+    if ! docker network inspect movie-mlops-network >/dev/null 2>&1; then
+        echo "네트워크 생성 중..."
+        docker network create movie-mlops-network
+        echo "✅ 네트워크 생성 완료"
+    fi
+    
     docker compose -f docker/docker-compose.api.yml up -d
     docker compose -f docker/docker-compose.airflow.yml up -d
     echo -e "${GREEN}✅ API 스택이 시작되었습니다.${NC}"
@@ -151,10 +241,51 @@ start_api_stack() {
 
 start_ml_stack() {
     echo -e "${GREEN}🤖 ML 스택 시작...${NC}"
-    docker compose -f docker/stacks/docker-compose.ml-stack.yml up -d
+    
+    # 네트워크 확인 및 생성
+    if ! docker network inspect movie-mlops-network >/dev/null 2>&1; then
+        echo "네트워크 생성 중..."
+        docker network create movie-mlops-network
+        echo "✅ 네트워크 생성 완료"
+    fi
+    
+    # 기존 관련 컨테이너 정리
+    echo "기존 ML 컨테이너 정리 중..."
+    containers_to_clean=("movie-mlops-feast" "movie-mlops-feast-new")
+    for container in "${containers_to_clean[@]}"; do
+        if docker ps -a --format "{{.Names}}" | grep -q "^${container}$"; then
+            docker stop "${container}" 2>/dev/null || true
+            docker rm "${container}" 2>/dev/null || true
+        fi
+    done
+    
+    # Feast 서버 개별 실행 (안정적 실행을 위해)
+    echo "Feast 서버 시작 중..."
+    docker run -d \
+      --name movie-mlops-feast-new \
+      --network movie-mlops-network \
+      -p 6567:6567 \
+      -v /mnt/c/dev/movie-mlops:/app \
+      movie-mlops-feast \
+      feast serve --host 0.0.0.0 --port 6567
+    
+    # 잠시 대기 (Feast 초기화 시간)
+    echo "Feast 서비스 안정화 대기 중... (5초)"
+    sleep 5
+    
+    # 나머지 ML 서비스들 (FastAPI, MLflow, Jupyter 등) - Feast 제외
+    echo "나머지 ML 서비스 시작 중..."
+    if [ -f "docker/stacks/docker-compose.ml-stack-fixed.yml" ]; then
+        echo "수정된 ML 스택에서 FastAPI, MLflow, Jupyter, Airflow 시작..."
+        docker compose -f docker/stacks/docker-compose.ml-stack-fixed.yml --project-directory . --profile development up -d api mlflow jupyter airflow-webserver airflow-scheduler
+    else
+        echo "기본 ML 스택에서 FastAPI, MLflow, Jupyter, Airflow 시작..."
+        docker compose -f docker/stacks/docker-compose.ml-stack.yml --project-directory . --profile development up -d api mlflow jupyter airflow-webserver airflow-scheduler
+    fi
+    
     echo -e "${GREEN}✅ ML 스택이 시작되었습니다.${NC}"
     echo "🔹 MLflow: http://localhost:5000"
-    echo "🔹 Feast: http://localhost:6566"
+    echo "🔹 Feast: http://localhost:6567/docs"
     echo "🔹 Jupyter: http://localhost:8888"
     echo "🔹 FastAPI: http://localhost:8000/docs"
     echo "🔹 Airflow: http://localhost:8080"
@@ -162,7 +293,15 @@ start_ml_stack() {
 
 start_monitoring_stack() {
     echo -e "${GREEN}📊 모니터링 스택 시작...${NC}"
-    docker compose -f docker/stacks/docker-compose.monitoring.yml up -d
+    
+    # 네트워크 확인 및 생성
+    if ! docker network inspect movie-mlops-network >/dev/null 2>&1; then
+        echo "네트워크 생성 중..."
+        docker network create movie-mlops-network
+        echo "✅ 네트워크 생성 완료"
+    fi
+    
+    docker compose -f docker/stacks/docker-compose.monitoring.yml --project-directory . up -d
     echo -e "${GREEN}✅ 모니터링 스택이 시작되었습니다.${NC}"
     echo "🔹 Prometheus: http://localhost:9090"
     echo "🔹 Grafana: http://localhost:3000 (admin/admin123)"
@@ -246,7 +385,7 @@ show_service_urls() {
     echo ""
     echo "🔹 ML 도구:"
     echo "   MLflow UI: http://localhost:5000"
-    echo "   Feast UI: http://localhost:6566"
+    echo "   Feast UI: http://localhost:6567"
     echo ""
     echo "🔹 워크플로우:"
     echo "   Airflow UI: http://localhost:8080 (admin/admin)"
@@ -255,10 +394,12 @@ show_service_urls() {
     echo "   Grafana: http://localhost:3000 (admin/admin123)"
     echo "   Prometheus: http://localhost:9090"
     echo "   Kafka UI: http://localhost:8082"
+    echo "   cAdvisor: http://localhost:8083"
     echo ""
     echo "🔹 데이터베이스:"
     echo "   PostgreSQL: localhost:5432"
     echo "   Redis: localhost:6379"
+    echo "   Redis Commander: http://localhost:8081"
 }
 
 view_logs() {
@@ -318,6 +459,66 @@ check_resources() {
     docker system df 2>/dev/null || echo "Docker 시스템 정보를 가져올 수 없습니다."
 }
 
+clean_containers() {
+    echo -e "${YELLOW}🧹 기존 컨테이너 정리...${NC}"
+    echo ""
+    
+    # 현재 실행 중인 movie-mlops 컨테이너 확인
+    echo "현재 실행 중인 Movie MLOps 컨테이너:"
+    running_containers=$(docker ps --filter "name=movie-mlops" --format "{{.Names}}" | wc -l)
+    
+    if [ "$running_containers" -gt 0 ]; then
+        docker ps --filter "name=movie-mlops" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+        echo ""
+        read -p "위 컨테이너들을 모두 중지하고 제거하시겠습니까? (y/N): " confirm
+        
+        if [[ $confirm =~ ^[Yy]$ ]]; then
+            echo "컨테이너들을 중지하고 제거합니다..."
+            
+            # 컨테이너 중지
+            echo "1️⃣ 컨테이너 중지 중..."
+            docker stop $(docker ps --filter "name=movie-mlops" -q) 2>/dev/null || true
+            
+            # 컨테이너 제거
+            echo "2️⃣ 컨테이너 제거 중..."
+            docker rm $(docker ps -aq --filter "name=movie-mlops") 2>/dev/null || true
+            
+            echo -e "${GREEN}✅ 모든 Movie MLOps 컨테이너가 정리되었습니다.${NC}"
+        else
+            echo "컨테이너 정리를 취소했습니다."
+        fi
+    else
+        echo "실행 중인 Movie MLOps 컨테이너가 없습니다."
+        
+        # 중지된 컨테이너도 확인
+        stopped_containers=$(docker ps -a --filter "name=movie-mlops" --format "{{.Names}}" | wc -l)
+        if [ "$stopped_containers" -gt 0 ]; then
+            echo ""
+            echo "중지된 Movie MLOps 컨테이너:"
+            docker ps -a --filter "name=movie-mlops" --format "table {{.Names}}\t{{.Status}}"
+            echo ""
+            read -p "중지된 컨테이너들을 제거하시겠습니까? (y/N): " confirm
+            
+            if [[ $confirm =~ ^[Yy]$ ]]; then
+                docker rm $(docker ps -aq --filter "name=movie-mlops") 2>/dev/null || true
+                echo -e "${GREEN}✅ 중지된 컨테이너들이 제거되었습니다.${NC}"
+            fi
+        else
+            echo "정리할 컨테이너가 없습니다."
+        fi
+    fi
+    
+    # 사용하지 않는 볼륨과 네트워크 정리 옵션
+    echo ""
+    read -p "사용하지 않는 Docker 볼륨과 네트워크도 정리하시겠습니까? (y/N): " cleanup_system
+    
+    if [[ $cleanup_system =~ ^[Yy]$ ]]; then
+        echo "3️⃣ 사용하지 않는 리소스 정리 중..."
+        docker system prune -f
+        echo -e "${GREEN}✅ Docker 시스템 정리가 완료되었습니다.${NC}"
+    fi
+}
+
 # 메인 실행부
 main() {
     print_header
@@ -325,7 +526,7 @@ main() {
     
     while true; do
         print_menu
-        read -p "선택해주세요 (0-13): " choice
+        read -p "선택해주세요 (0-14): " choice
         
         case $choice in
             1) setup_environment ;;
@@ -341,6 +542,7 @@ main() {
             11) check_status ;;
             12) view_logs ;;
             13) check_resources ;;
+            14) clean_containers ;;
             0) echo -e "${GREEN}👋 Movie MLOps 개발 환경을 종료합니다.${NC}"; exit 0 ;;
             *) echo -e "${RED}❌ 잘못된 선택입니다. 다시 선택해주세요.${NC}" ;;
         esac
