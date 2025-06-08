@@ -1,0 +1,122 @@
+# ==============================================================================
+# WSL Docker 개발 환경 Requirements
+# 용도: 로컬 개발, 테스트, 디버깅 (WSL 네이티브 환경)
+# Python 3.11 전용
+# ==============================================================================
+
+# 기본 개발 도구
+-r base.txt
+-r dev.txt
+
+# ==============================================================================
+# WSL Docker 환경에서 로컬 개발용 최소 의존성
+# ==============================================================================
+# Docker 컨테이너 외부에서 필요한 최소한의 패키지들
+
+# API 개발 (FastAPI 로컬 실행) - 선택적
+# -r api.txt
+
+# 데이터베이스 클라이언트 (로컬에서 Docker DB 접근) - 선택적
+# -r postgres.txt
+# -r redis.txt
+
+# ==============================================================================
+# 선택적 개발 환경 (필요시 주석 해제)
+# ==============================================================================
+# 로컬에서 개발할 서비스만 주석 해제하세요
+# 나머지는 Docker 컨테이너를 사용하는 것을 권장
+
+# Jupyter 로컬 실행 (권장: Docker 사용)
+# -r jupyter.txt
+
+# MLflow 로컬 개발 (권장: Docker 사용)
+# -r mlflow.txt
+
+# PyTorch 모델 개발 (로컬 GPU 사용 시에만)
+# -r pytorch.txt
+
+# Feast 피처 개발 (권장: Docker 사용)
+# -r feast.txt
+
+# 모니터링 도구 (권장: Docker 사용)
+# -r monitoring.txt
+
+# Kafka 클라이언트 (이벤트 개발 시)
+# -r kafka.txt
+
+# Airflow 로컬 개발 (권장하지 않음, Docker 사용)
+# -r airflow.txt
+
+# ==============================================================================
+# WSL Docker 개발 워크플로우 - Python 3.11 전용
+# ==============================================================================
+#
+# 1. Python 3.11 환경 확인:
+#    python --version  # Python 3.11.x 확인
+#
+# 2. 환경 문제 해결 (cryptography 등):
+#    chmod +x scripts/setup/fix_wsl_issues.sh
+#    ./scripts/setup/fix_wsl_issues.sh
+#
+# 3. 기본 개발 환경 설정:
+#    python -m venv venv
+#    source venv/bin/activate  # WSL/Linux
+#    pip install -r requirements-dev.txt
+#
+# 4. Docker 서비스 시작:
+#    ./run_movie_mlops.sh
+#    (메뉴에서 4번: 기본 인프라)
+#    (메뉴에서 5번: 개발 환경)
+#
+# 5. 로컬에서 API 개발:
+#    uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8001
+#    (Docker API는 8000, 로컬 개발은 8001 사용)
+#
+# 6. 테스트 실행:
+#    ./run_tests.sh
+#
+# 7. 코드 품질 체크:
+#    black src/ tests/
+#    flake8 src/ tests/
+#    mypy src/
+#
+# ==============================================================================
+# .env 파일 활용
+# ==============================================================================
+# WSL 환경에서도 .env 파일을 활용하세요:
+#
+# from dotenv import load_dotenv
+# import os
+# 
+# load_dotenv()  # .env 파일 로드
+# 
+# DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://localhost:5432/movie_data")
+# REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+#
+# ==============================================================================
+# Docker 서비스 연결 정보
+# ==============================================================================
+# 로컬 개발 시 Docker 서비스 접근:
+#
+# PostgreSQL: localhost:5432
+# Redis: localhost:6379
+# MLflow: http://localhost:5000
+# Jupyter: http://localhost:8888
+# Airflow: http://localhost:8080
+# API (Docker): http://localhost:8000
+
+# ==============================================================================
+# 문제 해결 - Python 3.11 전용
+# ==============================================================================
+# 
+# Q: Python 버전 문제?
+# A: Python 3.11만 지원됩니다. 정확한 버전을 설치하세요
+#
+# Q: cryptography 패키지 설치 실패?
+# A: ./scripts/setup/fix_wsl_issues.sh 실행
+#
+# Q: pytest 실행 오류?
+# A: pytest.ini 설정이 Python 3.11에 최적화되었습니다
+#
+# Q: Docker 서비스 연결 안됨?
+# A: ./run_movie_mlops.sh로 서비스 시작 확인

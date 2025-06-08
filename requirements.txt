@@ -1,0 +1,70 @@
+# ==============================================================================
+# WSL Docker 환경용 Movie MLOps Requirements
+# 용도: 전체 서비스 통합 개발 환경 (WSL에서 모든 서비스 로컬 실행 시에만 사용)
+# ==============================================================================
+
+# ⚠️ 주의사항:
+# - WSL Docker 환경에서는 일반적으로 이 파일을 직접 사용하지 않습니다
+# - 대신 requirements/ 폴더의 개별 서비스별 파일을 사용하세요
+# - Docker Compose가 .env 파일을 자동으로 로드합니다
+
+# ==============================================================================
+# 기본 환경 (모든 컨테이너에서 공통 사용)
+# ==============================================================================
+-r requirements/base.txt
+
+# ==============================================================================
+# WSL 로컬 개발 시에만 모든 서비스 설치 (권장하지 않음)
+# ==============================================================================
+# 개별 Docker 서비스 사용을 권장하지만, 필요시 아래 주석 해제
+
+# MLOps 핵심 서비스
+# -r requirements/airflow.txt     # Airflow 워크플로우
+# -r requirements/feast.txt       # Feast 피처 스토어
+# -r requirements/mlflow.txt      # MLflow 모델 레지스트리
+# -r requirements/pytorch.txt     # PyTorch 추론
+# -r requirements/kafka.txt       # Kafka 이벤트 스트리밍
+
+# 웹 서비스
+# -r requirements/api.txt         # FastAPI 서버
+
+# 데이터베이스 클라이언트
+# -r requirements/postgres.txt    # PostgreSQL 클라이언트
+# -r requirements/redis.txt       # Redis 클라이언트
+
+# 모니터링
+# -r requirements/monitoring.txt  # Prometheus + Grafana
+
+# 개발 도구
+# -r requirements/jupyter.txt     # Jupyter Notebook
+
+# ==============================================================================
+# WSL Docker 환경에서 권장하는 사용법
+# ==============================================================================
+# 
+# 1. 전체 서비스 시작:
+#    ./run_movie_mlops.sh
+#    (메뉴에서 2번 선택)
+#
+# 2. 개별 서비스 시작:
+#    docker-compose -f docker/docker-compose.api.yml up -d
+#    docker-compose -f docker/docker-compose.jupyter.yml up -d
+#
+# 3. 개발 환경만:
+#    docker-compose -f docker/docker-compose.postgres.yml up -d
+#    docker-compose -f docker/docker-compose.redis.yml up -d
+#    docker-compose -f docker/docker-compose.jupyter.yml up -d
+#
+# 4. .env 파일 자동 로드:
+#    모든 Docker Compose 파일이 .env를 자동으로 읽습니다
+#    export 명령 불필요!
+#
+# ==============================================================================
+# 환경 변수 확인
+# ==============================================================================
+# .env 파일이 올바르게 설정되었는지 확인:
+#
+# cat .env | grep -E "(POSTGRES_|REDIS_|MLFLOW_|AIRFLOW_)"
+#
+# Docker 환경에서 환경 변수 확인:
+# docker-compose -f docker/docker-compose.api.yml config
