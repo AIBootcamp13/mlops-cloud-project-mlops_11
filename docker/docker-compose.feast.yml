@@ -1,0 +1,73 @@
+# ==============================================================================
+# Docker Compose - Feast 피처 스토어
+# WSL Docker 환경용
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  feast:
+    build:
+      context: .
+      dockerfile: ./docker/dockerfiles/Dockerfile.feast
+      args:
+        - PYTHON_VERSION=3.11
+    image: ${FEAST_IMAGE_NAME:-movie-mlops/feast}:${FEAST_VERSION:-latest}
+    container_name: movie-mlops-feast
+    restart: unless-stopped
+    ports:
+      - "${FEAST_PORT:-6566}:6566"
+    environment:
+      # Feast 설정
+      - FEAST_REPO_PATH=${FEAST_REPO_PATH:-/app/feast_repo}
+      - FEAST_REGISTRY_PATH=${FEAST_REGISTRY_PATH:-/app/feast_repo/data/registry.db}
+      
+      # 데이터베이스 연결 (오프라인 스토어)
+      - FEAST_OFFLINE_STORE_TYPE=postgres
+      - FEAST_OFFLINE_STORE_HOST=postgres
+      - FEAST_OFFLINE_STORE_PORT=5432
+      - FEAST_OFFLINE_STORE_DATABASE=${POSTGRES_DB:-postgres}
+      - FEAST_OFFLINE_STORE_USER=${POSTGRES_USER:-postgres}
+      - FEAST_OFFLINE_STORE_PASSWORD=${POSTGRES_PASSWORD:-postgres123}
+      
+      # Redis 연결 (온라인 스토어)
+      - FEAST_ONLINE_STORE_TYPE=redis
+      - FEAST_ONLINE_STORE_HOST=redis
+      - FEAST_ONLINE_STORE_PORT=6379
+      - FEAST_ONLINE_STORE_DB=${REDIS_DB:-0}
+      
+      # 환경 설정
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - DEBUG=${DEBUG:-true}
+    volumes:
+      # Feast 리포지토리
+      - ./feast_repo:/app/feast_repo
+      # 데이터 폴더
+      - ./data/feast:/app/data
+      # 소스 코드 (피처 정의)
+      - ${HOST_PROJECT_PATH:-/mnt/c/dev/movie-mlops}/src/features:/app/src/features
+      # 로그 폴더
+      - ./logs/feast:/app/logs
+    working_dir: /app/feast_repo
+    networks:
+      - movie-mlops-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      bash -c "
+        feast apply &&
+        feast serve --host 0.0.0.0 --port 6566
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6566/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+networks:
+  movie-mlops-network:
+    external: true

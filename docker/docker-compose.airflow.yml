@@ -1,0 +1,116 @@
+# ==============================================================================
+# Airflow 전용 Docker Compose - 1아키텍처 + 5아키텍처
+# 용도: Airflow 워크플로우 개발 환경
+# 실행: docker-compose -f docker/docker-compose.airflow.yml up
+# ==============================================================================
+
+version: '3.8'
+
+networks:
+  airflow-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  airflow_logs:
+
+services:
+  # =============================================================================
+  # 인프라: PostgreSQL
+  # =============================================================================
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:15-alpine}
+    container_name: airflow-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/configs/init-airflow-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    networks:
+      - airflow-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # 인프라: Redis (Celery)
+  # =============================================================================
+  redis:
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    container_name: airflow-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - airflow-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # Airflow 웹서버
+  # =============================================================================
+  airflow-webserver:
+    build:
+      context: ${HOST_PROJECT_PATH:-.}
+      dockerfile: docker/dockerfiles/Dockerfile.airflow
+    container_name: airflow-webserver
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW__WEBSERVER__SECRET_KEY:-changeme}
+      - PYTHONPATH=/app:/app/src
+    volumes:
+      - ${HOST_PROJECT_PATH:-.}:/app
+      - airflow_logs:/opt/airflow/logs
+    ports:
+      - "${AIRFLOW_WEBSERVER_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - airflow-network
+    command: >
+      bash -c "
+        airflow db init &&
+        airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@movie-mlops.com --password admin &&
+        airflow webserver --port 8080
+      "
+
+  # =============================================================================
+  # Airflow 스케줄러
+  # =============================================================================
+  airflow-scheduler:
+    build:
+      context: ${HOST_PROJECT_PATH:-.}
+      dockerfile: docker/dockerfiles/Dockerfile.airflow
+    container_name: airflow-scheduler
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - PYTHONPATH=/app:/app/src
+    volumes:
+      - ${HOST_PROJECT_PATH:-.}:/app
+      - airflow_logs:/opt/airflow/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - airflow-network
+    command: airflow scheduler

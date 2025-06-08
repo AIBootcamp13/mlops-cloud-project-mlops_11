@@ -1,0 +1,63 @@
+# ==============================================================================
+# Docker Compose - Jupyter Notebook 개발 환경
+# WSL Docker 환경용
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  jupyter:
+    build:
+      context: .
+      dockerfile: ./docker/dockerfiles/Dockerfile.jupyter
+      args:
+        - PYTHON_VERSION=3.11
+    image: ${JUPYTER_IMAGE_NAME:-movie-mlops/jupyter}:${API_VERSION:-latest}
+    container_name: movie-mlops-jupyter
+    restart: unless-stopped
+    ports:
+      - "${JUPYTER_PORT:-8888}:8888"
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN:-movie-mlops-jupyter}
+      - GRANT_SUDO=yes
+      - CHOWN_HOME=yes
+      - CHOWN_HOME_OPTS=-R
+    volumes:
+      # 소스 코드 마운트 (WSL 경로)
+      - ${HOST_PROJECT_PATH:-/mnt/c/dev/movie-mlops}:${CONTAINER_PROJECT_PATH:-/app}
+      # Jupyter 노트북 전용 폴더
+      - ./notebooks:/home/jovyan/notebooks
+      # 데이터 폴더
+      - ./data:/home/jovyan/data
+      # 모델 폴더  
+      - ./models:/home/jovyan/models
+      # 설정 폴더
+      - ./config:/home/jovyan/config
+    working_dir: ${CONTAINER_PROJECT_PATH:-/app}
+    networks:
+      - movie-mlops-network
+    user: root
+    command: >
+      bash -c "
+        pip install -r requirements/jupyter.txt &&
+        pip install -r requirements/base.txt &&
+        pip install -r requirements/dev.txt &&
+        start-notebook.sh 
+        --NotebookApp.token='${JUPYTER_TOKEN:-movie-mlops-jupyter}'
+        --NotebookApp.password=''
+        --NotebookApp.allow_root=True
+        --NotebookApp.ip='0.0.0.0'
+        --NotebookApp.port=8888
+        --NotebookApp.notebook_dir='/home/jovyan'
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/api"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  movie-mlops-network:
+    external: true

@@ -1,0 +1,311 @@
+# ==============================================================================
+# MLOps 9아키텍처 Docker Compose - 전체 개발 환경
+# 용도: 모든 아키텍처를 포함한 완전한 개발 환경
+# 실행: docker-compose -f docker/docker-compose.main.yml up
+# ==============================================================================
+
+version: '3.8'
+
+# 공통 네트워크
+networks:
+  movie-mlops-network:
+    driver: bridge
+
+# 공통 볼륨
+volumes:
+  postgres_data:
+  redis_data:
+  airflow_logs:
+  mlflow_artifacts:
+  feast_data:
+  prometheus_data:
+  grafana_data:
+
+services:
+  # =============================================================================
+  # 공통 인프라: PostgreSQL
+  # =============================================================================
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:15-alpine}
+    container_name: movie-mlops-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/configs/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    networks:
+      - movie-mlops-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # 공통 인프라: Redis
+  # =============================================================================
+  redis:
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    container_name: movie-mlops-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - movie-mlops-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # 1아키텍처 + 5아키텍처: Apache Airflow
+  # =============================================================================
+  airflow:
+    build:
+      context: ${HOST_PROJECT_PATH:-.}
+      dockerfile: docker/dockerfiles/Dockerfile.airflow
+      args:
+        - AIRFLOW_VERSION=${AIRFLOW_VERSION:-2.10.5}
+    container_name: movie-mlops-airflow
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=${AIRFLOW__CORE__EXECUTOR:-LocalExecutor}
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN:-postgresql+psycopg2://airflow:airflow@postgres:5432/airflow}
+      - AIRFLOW__CORE__LOAD_EXAMPLES=${AIRFLOW__CORE__LOAD_EXAMPLES:-False}
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=${AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION:-True}
+      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW__WEBSERVER__SECRET_KEY:-changeme}
+      - PYTHONPATH=/app:/app/src
+    volumes:
+      - ${HOST_PROJECT_PATH:-.}:/app
+      - airflow_logs:/opt/airflow/logs
+    ports:
+      - "${AIRFLOW_WEBSERVER_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - movie-mlops-network
+    command: >
+      bash -c "
+        airflow db init &&
+        airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@movie-mlops.com --password admin &&
+        airflow webserver --port 8080 &
+        airflow scheduler
+      "
+
+  # =============================================================================
+  # 6아키텍처: MLflow
+  # =============================================================================
+  mlflow:
+    build:
+      context: ${HOST_PROJECT_PATH:-.}
+      dockerfile: docker/dockerfiles/Dockerfile.mlflow
+      args:
+        - MLFLOW_VERSION=${MLFLOW_VERSION:-2.17.2}
+    container_name: movie-mlops-mlflow
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=${MLFLOW_BACKEND_STORE_URI:-postgresql://mlflow:mlflow@postgres:5432/mlflow}
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=${MLFLOW_DEFAULT_ARTIFACT_ROOT:-file:///app/mlartifacts}
+      - PYTHONPATH=/app:/app/src
+    volumes:
+      - ${HOST_PROJECT_PATH:-.}:/app
+      - mlflow_artifacts:/app/mlartifacts
+    ports:
+      - "${MLFLOW_PORT:-5000}:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - movie-mlops-network
+    command: >
+      bash -c "
+        mlflow db upgrade postgresql://mlflow:mlflow@postgres:5432/mlflow &&
+        mlflow server --backend-store-uri postgresql://mlflow:mlflow@postgres:5432/mlflow --default-artifact-root file:///app/mlartifacts --host 0.0.0.0 --port 5000
+      "
+
+  # =============================================================================
+  # 2아키텍처: Feast
+  # =============================================================================
+  feast:
+    build:
+      context: ${HOST_PROJECT_PATH:-.}
+      dockerfile: docker/dockerfiles/Dockerfile.feast
+      args:
+        - FEAST_VERSION=${FEAST_VERSION:-0.40.1}
+    container_name: movie-mlops-feast
+    environment:
+      - PYTHONPATH=/app:/app/src
+    volumes:
+      - ${HOST_PROJECT_PATH:-.}:/app
+      - feast_data:/app/feast_data
+    ports:
+      - "${FEAST_PORT:-6566}:6566"
+    networks:
+      - movie-mlops-network
+    depends_on:
+      - redis
+    command: >
+      bash -c "
+        cd /app/feast_repo && 
+        feast serve --host 0.0.0.0 --port 6566
+      "
+
+  # =============================================================================
+  # 7아키텍처: PyTorch API
+  # =============================================================================
+  pytorch-api:
+    build:
+      context: ${HOST_PROJECT_PATH:-.}
+      dockerfile: docker/dockerfiles/Dockerfile.pytorch
+      args:
+        - PYTORCH_VERSION=${PYTORCH_VERSION:-2.5.1}
+    container_name: movie-mlops-pytorch-api
+    environment:
+      - PYTORCH_DEVICE=${PYTORCH_DEVICE:-cpu}
+      - PYTHONPATH=/app:/app/src
+    volumes:
+      - ${HOST_PROJECT_PATH:-.}:/app
+      - ${MODELS_PATH:-./models}:/app/models
+    ports:
+      - "${PYTORCH_API_PORT:-8001}:8001"
+    networks:
+      - movie-mlops-network
+    depends_on:
+      - mlflow
+    # PyTorch API 서버 구현 후 command 수정 필요
+
+  # =============================================================================
+  # FastAPI 메인 API
+  # =============================================================================
+  api:
+    build:
+      context: ${HOST_PROJECT_PATH:-.}
+      dockerfile: docker/dockerfiles/Dockerfile.api
+    container_name: movie-mlops-api
+    environment:
+      - API_HOST=${API_HOST:-0.0.0.0}
+      - API_PORT=${API_PORT:-8000}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - SECRET_KEY=${SECRET_KEY:-changeme}
+      - PYTHONPATH=/app:/app/src
+    volumes:
+      - ${HOST_PROJECT_PATH:-.}:/app
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - movie-mlops-network
+    command: >
+      bash -c "
+        uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+      "
+
+  # =============================================================================
+  # 9아키텍처: Zookeeper (Kafka 의존성)
+  # =============================================================================
+  zookeeper:
+    image: ${ZOOKEEPER_IMAGE:-confluentinc/cp-zookeeper:7.5.0}
+    container_name: movie-mlops-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_PORT:-2181}
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - ./data/zookeeper:/var/lib/zookeeper/data
+    networks:
+      - movie-mlops-network
+
+  # =============================================================================
+  # 9아키텍처: Apache Kafka
+  # =============================================================================
+  kafka:
+    image: ${KAFKA_IMAGE:-confluentinc/cp-kafka:7.5.0}
+    container_name: movie-mlops-kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: ${KAFKA_BROKER_ID:-1}
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    ports:
+      - "${KAFKA_PORT:-9092}:9092"
+    volumes:
+      - ./data/kafka:/var/lib/kafka/data
+    networks:
+      - movie-mlops-network
+
+  # =============================================================================
+  # 8아키텍처: Prometheus
+  # =============================================================================
+  prometheus:
+    image: ${PROMETHEUS_IMAGE:-prom/prometheus:v2.48.0}
+    container_name: movie-mlops-prometheus
+    volumes:
+      - ./docker/configs/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    networks:
+      - movie-mlops-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+
+  # =============================================================================
+  # 8아키텍처: Grafana
+  # =============================================================================
+  grafana:
+    image: ${GRAFANA_IMAGE:-grafana/grafana:10.2.0}
+    container_name: movie-mlops-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin123}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/configs/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - movie-mlops-network
+
+  # =============================================================================
+  # 개발 도구: Jupyter Lab
+  # =============================================================================
+  jupyter:
+    build:
+      context: ${HOST_PROJECT_PATH:-.}
+      dockerfile: docker/dockerfiles/Dockerfile.jupyter
+    container_name: movie-mlops-jupyter
+    environment:
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN:-movie-mlops-jupyter}
+      - PYTHONPATH=/app:/app/src
+    volumes:
+      - ${HOST_PROJECT_PATH:-.}:/app
+      - ${JUPYTER_NOTEBOOKS_PATH:-./notebooks}:/app/notebooks
+    ports:
+      - "${JUPYTER_PORT:-8888}:8888"
+    networks:
+      - movie-mlops-network
+    command: >
+      bash -c "
+        jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --token=${JUPYTER_TOKEN:-movie-mlops-jupyter}
+      "

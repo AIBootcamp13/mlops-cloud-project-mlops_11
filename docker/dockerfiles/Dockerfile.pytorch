@@ -1,0 +1,50 @@
+# ==============================================================================
+# PyTorch Dockerfile - 7아키텍처
+# Python 3.11 + PyTorch 2.5.1 + 호환성 보장
+# ==============================================================================
+
+FROM python:3.11-slim
+
+# 빌드 인수
+ARG PYTORCH_VERSION=2.5.1
+
+# 환경 변수 설정
+ENV PYTHONPATH=/app:/app/src
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TORCH_HOME=/app/.torch
+
+# 시스템 패키지 설치
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# 작업 디렉터리 설정
+WORKDIR /app
+
+# pip 업그레이드
+RUN pip install --upgrade pip
+
+# Requirements 복사 및 설치
+COPY requirements/pytorch.txt /tmp/requirements-pytorch.txt
+RUN pip install -r /tmp/requirements-pytorch.txt --index-url https://download.pytorch.org/whl/cpu
+
+# 애플리케이션 코드 복사
+COPY . /app/
+
+# PyTorch 디렉터리 생성
+RUN mkdir -p /app/models /app/.torch
+
+# PyTorch 사용자 생성 및 권한 설정
+RUN groupadd --gid 1000 pytorch \
+    && useradd --uid 1000 --gid pytorch --shell /bin/bash --create-home pytorch \
+    && chown -R pytorch:pytorch /app
+
+USER pytorch
+
+# 포트 노출
+EXPOSE 8001
+
+# 기본 명령어 (개발 중)
+CMD ["python", "-c", "print('PyTorch container started'); import time; time.sleep(3600)"]

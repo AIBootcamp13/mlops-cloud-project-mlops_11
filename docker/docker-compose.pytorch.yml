@@ -1,0 +1,92 @@
+# ==============================================================================
+# PyTorch 전용 Docker Compose - 7아키텍처
+# 용도: PyTorch 모델 개발 및 추론 환경
+# 실행: docker-compose -f docker/docker-compose.pytorch.yml up
+# ==============================================================================
+
+version: '3.8'
+
+networks:
+  pytorch-network:
+    driver: bridge
+
+volumes:
+  models_data:
+  jupyter_data:
+
+services:
+  # =============================================================================
+  # PyTorch 개발 환경
+  # =============================================================================
+  pytorch-dev:
+    build:
+      context: ${HOST_PROJECT_PATH:-.}
+      dockerfile: docker/dockerfiles/Dockerfile.pytorch
+    container_name: pytorch-dev
+    environment:
+      - PYTORCH_DEVICE=${PYTORCH_DEVICE:-cpu}
+      - TORCH_HOME=/app/.torch
+      - PYTHONPATH=/app:/app/src
+    volumes:
+      - ${HOST_PROJECT_PATH:-.}:/app
+      - models_data:/app/models
+    networks:
+      - pytorch-network
+    # GPU 지원 (필요시 주석 해제)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  # =============================================================================
+  # PyTorch 추론 API
+  # =============================================================================
+  pytorch-api:
+    build:
+      context: ${HOST_PROJECT_PATH:-.}
+      dockerfile: docker/dockerfiles/Dockerfile.pytorch
+    container_name: pytorch-api
+    environment:
+      - PYTORCH_DEVICE=${PYTORCH_DEVICE:-cpu}
+      - API_PORT=${PYTORCH_API_PORT:-8001}
+      - PYTHONPATH=/app:/app/src
+    volumes:
+      - ${HOST_PROJECT_PATH:-.}:/app
+      - models_data:/app/models
+    ports:
+      - "${PYTORCH_API_PORT:-8001}:8001"
+    networks:
+      - pytorch-network
+    command: >
+      bash -c "
+        echo 'PyTorch API server will start here' &&
+        sleep infinity
+      "
+    # 실제 PyTorch API 구현 후 command 수정
+
+  # =============================================================================
+  # Jupyter Lab (PyTorch 개발)
+  # =============================================================================
+  jupyter:
+    build:
+      context: ${HOST_PROJECT_PATH:-.}
+      dockerfile: docker/dockerfiles/Dockerfile.jupyter
+    container_name: pytorch-jupyter
+    environment:
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN:-pytorch-jupyter}
+      - PYTORCH_DEVICE=${PYTORCH_DEVICE:-cpu}
+      - PYTHONPATH=/app:/app/src
+    volumes:
+      - ${HOST_PROJECT_PATH:-.}:/app
+      - jupyter_data:/app/notebooks
+    ports:
+      - "${JUPYTER_PORT:-8888}:8888"
+    networks:
+      - pytorch-network
+    command: >
+      bash -c "
+        jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --token=${JUPYTER_TOKEN:-pytorch-jupyter}
+      "
