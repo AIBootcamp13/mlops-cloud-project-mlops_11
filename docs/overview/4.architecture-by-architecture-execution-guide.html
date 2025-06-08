@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MLOps 아키텍처별 실행 가이드</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Light 모드 전용 색상 팔레트 */
+            --primary-color: #6366f1;
+            --primary-light: #8b5cf6;
+            --primary-dark: #4338ca;
+            --secondary-color: #06b6d4;
+            --accent-color: #f59e0b;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --error-color: #ef4444;
+            --info-color: #3b82f6;
+            
+            /* 밝고 깔끔한 배경 */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #f1f5f9;
+            --bg-quaternary: #e2e8f0;
+            --bg-card: #ffffff;
+            --bg-glass: rgba(255, 255, 255, 0.85);
+            
+            /* 텍스트 색상 - Light 모드 최적화 */
+            --text-primary: #1e293b;
+            --text-secondary: #475569;
+            --text-muted: #64748b;
+            --text-light: #94a3b8;
+            
+            /* 테두리 및 구분선 */
+            --border-color: #e2e8f0;
+            --border-hover: #cbd5e1;
+            --border-focus: #6366f1;
+            
+            /* 그림자 효과 - 더 부드럽고 세련된 */
+            --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.08);
+            --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.12);
+            --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+            --shadow-xl: 0 20px 40px -12px rgba(0, 0, 0, 0.2);
+            --shadow-2xl: 0 25px 50px -15px rgba(0, 0, 0, 0.25);
+            
+            /* 그라디언트 - 더 화려하고 modern한 */
+            --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --gradient-accent: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            --gradient-success: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+            --gradient-info: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            --gradient-warm: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            --gradient-cool: linear-gradient(135deg, #d299c2 0%, #fef9d3 100%);
+            
+            /* 애니메이션 변수 */
+            --transition-fast: 0.15s ease-out;
+            --transition-normal: 0.3s ease-out;
+            --transition-slow: 0.5s ease-out;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            font-size: 16px;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            line-height: 1.7;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%);
+            color: var(--text-primary);
+            font-size: 16px;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* 배경 장식 요소들 */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: 
+                radial-gradient(circle at 20% 20%, rgba(99, 102, 241, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(168, 85, 247, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 40% 60%, rgba(6, 182, 212, 0.03) 0%, transparent 50%);
+            animation: float 20s ease-in-out infinite;
+            z-index: -1;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(30px, -30px) rotate(1deg); }
+            66% { transform: translate(-20px, 20px) rotate(-1deg); }
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: var(--bg-glass);
+            padding: 60px;
+            border-radius: 24px;
+            box-shadow: var(--shadow-2xl);
+            margin-top: 30px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--gradient-primary);
+            border-radius: 24px 24px 0 0;
+        }
+
+        /* 타이틀 스타일 개선 */
+        h1 {
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-align: center;
+            font-weight: 800;
+            font-size: 3rem;
+            margin-bottom: 3rem;
+            position: relative;
+            letter-spacing: -0.025em;
+            line-height: 1.2;
+        }
+
+        h1::after {
+            content: '';
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 4px;
+            background: var(--gradient-primary);
+            border-radius: 2px;
+            box-shadow: var(--shadow-md);
+        }
+
+        /* 헤딩 스타일 개선 */
+        h2 {
+            color: var(--text-primary);
+            font-weight: 700;
+            font-size: 2rem;
+            margin-top: 4rem;
+            margin-bottom: 2rem;
+            position: relative;
+            padding-left: 30px;
+            letter-spacing: -0.025em;
+        }
+
+        h2::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 8px;
+            height: 100%;
+            background: var(--gradient-primary);
+            border-radius: 4px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        h3 {
+            color: var(--primary-color);
+            font-weight: 700;
+            font-size: 1.5rem;
+            margin-top: 2.5rem;
+            margin-bottom: 1.5rem;
+            letter-spacing: -0.025em;
+        }
+
+        h4 {
+            color: var(--secondary-color);
+            font-weight: 600;
+            font-size: 1.25rem;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        /* 문서 정보 박스 개선 */
+        .info {
+            background: var(--gradient-info);
+            border-left: 6px solid var(--info-color);
+            padding: 30px;
+            margin: 30px 0;
+            border-radius: 0 16px 16px 0;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .info::before {
+            content: '📋';
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 2rem;
+            opacity: 0.7;
+        }
+
+        /* 집 짓기 비유 박스 - 더 화려하게 */
+        .house-analogy {
+            background: var(--gradient-cool);
+            border: 3px solid var(--info-color);
+            border-radius: 20px;
+            padding: 35px;
+            margin: 30px 0;
+            position: relative;
+            overflow: hidden;
+            transform: translateY(0);
+            transition: var(--transition-normal);
+        }
+
+        .house-analogy::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background: var(--gradient-primary);
+            border-radius: 20px 20px 0 0;
+        }
+
+        .house-analogy::after {
+            content: '🏠';
+            position: absolute;
+            top: 20px;
+            right: 25px;
+            font-size: 2.5rem;
+            opacity: 0.8;
+            animation: bounce 2s ease-in-out infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .house-analogy:hover {
+            transform: translateY(-8px);
+            box-shadow: var(--shadow-2xl);
+        }
+
+        /* 개념 설명 박스 */
+        .concept-box {
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: 16px;
+            padding: 30px;
+            margin: 25px 0;
+            transition: var(--transition-normal);
+            border-left: 6px solid var(--primary-color);
+            position: relative;
+        }
+
+        .concept-box::before {
+            content: '💡';
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 1.5rem;
+            opacity: 0.7;
+        }
+
+        .concept-box:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-4px);
+            border-color: var(--primary-color);
+        }
+
+        /* 실행 박스 - 더 눈에 띄게 */
+        .execution-box {
+            background: var(--gradient-warm);
+            border: 2px solid var(--warning-color);
+            border-radius: 16px;
+            padding: 30px;
+            margin: 25px 0;
+            position: relative;
+            box-shadow: var(--shadow-md);
+        }
+
+        .execution-box::before {
+            content: '⚡';
+            position: absolute;
+            top: 20px;
+            right: 25px;
+            font-size: 2rem;
+            opacity: 0.8;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+
+        /* 체크리스트 박스 */
+        .checklist {
+            background: var(--gradient-success);
+            border: 2px solid var(--success-color);
+            border-radius: 16px;
+            padding: 30px;
+            margin: 25px 0;
+            position: relative;
+            box-shadow: var(--shadow-md);
+        }
+
+        .checklist::before {
+            content: '✅';
+            position: absolute;
+            top: 20px;
+            right: 25px;
+            font-size: 2rem;
+        }
+
+        /* 문제 해결 박스 */
+        .troubleshooting {
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+            border: 2px solid var(--error-color);
+            border-radius: 16px;
+            padding: 30px;
+            margin: 25px 0;
+            position: relative;
+            box-shadow: var(--shadow-md);
+        }
+
+        .troubleshooting::before {
+            content: '🔧';
+            position: absolute;
+            top: 20px;
+            right: 25px;
+            font-size: 2rem;
+        }
+
+        /* 성공 메시지 박스 */
+        .success {
+            background: var(--gradient-success);
+            border-left: 6px solid var(--success-color);
+            padding: 30px;
+            margin: 30px 0;
+            border-radius: 0 16px 16px 0;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+        }
+
+        .success::before {
+            content: '🎉';
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 2rem;
+        }
+
+        /* 경고 메시지 박스 */
+        .warning {
+            background: var(--gradient-warm);
+            border-left: 6px solid var(--warning-color);
+            padding: 30px;
+            margin: 30px 0;
+            border-radius: 0 16px 16px 0;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+        }
+
+        .warning::before {
+            content: '⚠️';
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 2rem;
+        }
+
+        /* 코드 블록 개선 */
+        pre {
+            background: #f1f5f9;
+            color: #1e293b;
+            padding: 30px;
+            border-radius: 16px;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            margin: 25px 0;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        pre::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--gradient-primary);
+            border-radius: 16px 16px 0 0;
+        }
+
+        /* 코드 복사 버튼 추가 */
+        pre::after {
+            content: '📋';
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 1.2rem;
+            opacity: 0.6;
+            cursor: pointer;
+            transition: var(--transition-fast);
+        }
+
+        pre:hover::after {
+            opacity: 1;
+        }
+
+        code {
+            background: #f1f5f9;
+            color: var(--primary-color);
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9em;
+            font-weight: 500;
+            border: 1px solid #e2e8f0;
+        }
+
+        /* 테이블 스타일 개선 */
+        .table-container {
+            overflow-x: auto;
+            margin: 30px 0;
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+            background: var(--bg-card);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 20px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background: var(--gradient-primary);
+            color: white;
+            font-weight: 700;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        tr:nth-child(even) {
+            background: var(--bg-secondary);
+        }
+
+        tr:hover {
+            background: rgba(99, 102, 241, 0.05);
+            transition: var(--transition-fast);
+        }
+
+        /* 목차 (TOC) 개선 */
+        .toc {
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: 20px;
+            padding: 40px;
+            margin: 40px 0;
+            box-shadow: var(--shadow-xl);
+            position: relative;
+        }
+
+        .toc::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background: var(--gradient-primary);
+            border-radius: 20px 20px 0 0;
+        }
+
+        .toc h3 {
+            margin-top: 0;
+            color: var(--primary-color);
+            border-bottom: 3px solid var(--primary-color);
+            padding-bottom: 15px;
+            font-size: 1.8rem;
+        }
+
+        .toc ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+        .toc li {
+            margin: 15px 0;
+            position: relative;
+        }
+
+        .toc a {
+            text-decoration: none;
+            color: var(--text-secondary);
+            font-weight: 500;
+            transition: var(--transition-normal);
+            display: block;
+            padding: 12px 20px;
+            border-radius: 12px;
+            border-left: 4px solid transparent;
+        }
+
+        .toc a:hover {
+            color: var(--primary-color);
+            background: rgba(99, 102, 241, 0.08);
+            transform: translateX(8px);
+            border-left-color: var(--primary-color);
+        }
+
+        /* 이모지 스타일 */
+        .emoji {
+            font-size: 1.4em;
+            display: inline-block;
+            margin-right: 10px;
+            animation: sparkle 3s ease-in-out infinite;
+        }
+
+        @keyframes sparkle {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        /* 스크롤바 스타일링 */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--gradient-primary);
+            border-radius: 5px;
+            border: 2px solid var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-dark);
+        }
+
+        /* 통계 카드 스타일 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 25px;
+            margin: 30px 0;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            padding: 25px;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: var(--shadow-md);
+            border: 2px solid var(--border-color);
+            transition: var(--transition-normal);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-8px);
+            box-shadow: var(--shadow-xl);
+            border-color: var(--primary-color);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--primary-color);
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        /* 추가 인터랙티브 요소들 */
+        .hover-lift {
+            transition: var(--transition-normal);
+        }
+
+        .hover-lift:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-xl);
+        }
+
+        /* 반응형 디자인 */
+        @media (max-width: 768px) {
+            .container {
+                margin: 15px;
+                padding: 30px;
+                border-radius: 16px;
+            }
+
+            h1 {
+                font-size: 2.5rem;
+            }
+
+            h2 {
+                font-size: 1.8rem;
+            }
+
+            h3 {
+                font-size: 1.3rem;
+            }
+
+            pre {
+                padding: 20px;
+                font-size: 12px;
+            }
+
+            .house-analogy, .concept-box, .execution-box, .checklist, .troubleshooting {
+                padding: 20px;
+            }
+
+            .toc {
+                padding: 25px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                margin: 10px;
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            h2 {
+                font-size: 1.5rem;
+                padding-left: 20px;
+            }
+
+            h2::before {
+                width: 6px;
+            }
+        }
+
+        /* 인쇄 스타일 */
+        @media print {
+            body {
+                background: white;
+            }
+
+            .container {
+                box-shadow: none;
+                border: 1px solid #ccc;
+                background: white;
+            }
+
+            h1, h2, h3, h4 {
+                color: #333 !important;
+            }
+
+            pre {
+                background: #f5f5f5 !important;
+                color: #333 !important;
+                border: 1px solid #ddd;
+            }
+
+            .house-analogy, .concept-box, .execution-box, .checklist, .troubleshooting {
+                background: #f9f9f9 !important;
+                border: 1px solid #ddd !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><span class="emoji">🎬</span> MLOps 아키텍처별 실행 가이드</h1>
+        
+        <div class="info">
+            <strong>📋 문서 정보</strong><br>
+            <strong>제목:</strong> MLOps 아키텍처별 실행 가이드<br>
+            <strong>설명:</strong> MLOps 9아키텍처의 단계별 실행 방법과 집 짓기 비유를 통한 직관적 이해 가이드<br>
+            <strong>작성자:</strong> MLOps Project Team<br>
+            <strong>생성일:</strong> 2025-06-08<br>
+            <strong>버전:</strong> 1.0<br>
+            <strong>예상 읽기 시간:</strong> 45분<br>
+            <strong>난이도:</strong> 초급자부터 중급자<br>
+            <strong>대상:</strong> MLOps 엔지니어, 데이터 사이언티스트, 개발자
+        </div>
+
+        <div class="toc">
+            <h3>📚 목차</h3>
+            <ul>
+                <li><a href="#overview">개요</a></li>
+                <li><a href="#prerequisites">사전 준비사항</a></li>
+                <li><a href="#arch1">1아키텍처: 기초 공사 및 배관 작업 (Apache Airflow)</a></li>
+                <li><a href="#arch2">2아키텍처: 자재 창고 건설 (Feast)</a></li>
+                <li><a href="#arch3">3아키텍처: 설계도면 관리소 (Git + GitHub)</a></li>
+                <li><a href="#arch4">4아키텍처: 자동화 건설 장비 도입 (GitHub Actions)</a></li>
+                <li><a href="#arch5">5아키텍처: 공사 관리 시스템 구축 (Airflow 워크플로우)</a></li>
+                <li><a href="#arch6">6아키텍처: 품질 검사 및 건축 인증소 (MLflow)</a></li>
+                <li><a href="#arch7">7아키텍처: 입주 및 생활 인프라 구축 (PyTorch)</a></li>
+                <li><a href="#arch8">8아키텍처: 관리사무소 및 보안 시스템 (Prometheus + Grafana)</a></li>
+                <li><a href="#arch9">9아키텍처: 스마트홈 자동화 시스템 (Apache Kafka)</a></li>
+                <li><a href="#integration">통합 테스트 및 E2E 시나리오</a></li>
+                <li><a href="#conclusion">결론 및 다음 단계</a></li>
+            </ul>
+        </div>
+
+        <h2 id="overview">개요</h2>
+        <p>이 가이드는 MLOps 9아키텍처를 집 짓기 과정에 비유하여 각 아키텍처의 개념을 이해하고, 
+        실제 실행 방법을 단계별로 안내합니다. 복잡한 MLOps 개념을 친숙한 건축 과정으로 설명하여 
+        누구나 쉽게 따라할 수 있도록 구성했습니다.</p>
+
+        <h2 id="prerequisites"><span class="emoji">🚀</span> 사전 준비사항</h2>
+        
+        <h3>환경 설정</h3>
+        <div class="execution-box">
+            <pre><code># 1. 프로젝트 클론
+git clone &lt;repository-url&gt;
+cd movie-mlops
+
+# 2. 환경 변수 설정
+cp .env.template .env
+# .env 파일에서 TMDB_API_KEY 등 필수 값 설정
+
+# 3. 실행 권한 부여
+chmod +x run_movie_mlops.sh
+chmod +x scripts/**/*.sh
+
+# 4. 기본 환경 설정
+./run_movie_mlops.sh
+# 메뉴에서 1번 선택 (최초 1회)</code></pre>
+        </div>
+
+        <h2 id="arch1"><span class="emoji">💪</span> 1아키텍처: 기초 공사 및 배관 작업 (Apache Airflow)</h2>
+        
+        <div class="house-analogy hover-lift">
+            <h3><span class="emoji">🏗️</span> 집 짓기 비유</h3>
+            <p><strong>"집의 토대가 되는 기초 콘크리트를 붓고, 상하수도 배관을 설치"</strong></p>
+            <p>데이터 파이프라인은 집의 배관과 같습니다. 깨끗한 물(데이터)이 들어와서 
+            처리된 후 필요한 곳으로 흘러가야 하듯이, 원시 데이터가 수집되어 
+            처리된 후 ML 모델이 사용할 수 있는 형태로 변환되어야 합니다.</p>
+        </div>
+
+        <h3><span class="emoji">📚</span> 개념 설명</h3>
+        <div class="concept-box hover-lift">
+            <h4>데이터 파이프라인이란?</h4>
+            <ul>
+                <li>원시 데이터를 수집하여 분석 가능한 형태로 변환하고 저장하는 자동화된 프로세스</li>
+                <li>ETL(Extract, Transform, Load) 과정을 자동화</li>
+                <li>데이터 품질 보장 및 일관성 유지</li>
+            </ul>
+
+            <h4>Apache Airflow란?</h4>
+            <ul>
+                <li>Python으로 작성된 오픈소스 워크플로우 관리 플랫폼</li>
+                <li>DAG(Directed Acyclic Graph)를 통해 복잡한 워크플로우를 시각적으로 관리</li>
+                <li>스케줄링, 모니터링, 실패 처리 등 강력한 기능 제공</li>
+            </ul>
+        </div>
+
+        <h3><span class="emoji">🔧</span> 실행 방법</h3>
+        <div class="execution-box">
+            <h4>개별 실행</h4>
+            <pre><code># PostgreSQL과 Airflow 서비스 시작
+docker compose -f docker/docker-compose.postgres.yml up -d
+docker compose -f docker/docker-compose.airflow.yml up -d</code></pre>
+
+            <h4>통합 스크립트 사용</h4>
+            <pre><code>./run_movie_mlops.sh
+# 메뉴에서 5번 선택 (API 스택)</code></pre>
+        </div>
+
+        <h3><span class="emoji">🎯</span> Airflow 사용 방법</h3>
+        
+        <h4>1. Airflow UI 접속 및 기본 사용법</h4>
+        <div class="execution-box">
+            <pre><code># Airflow 웹 UI 접속
+open http://localhost:8080
+# 로그인 정보: admin / admin</code></pre>
+        </div>
+
+        <div class="info">
+            <strong>주요 UI 구성 요소:</strong>
+            <ul>
+                <li><strong>DAGs:</strong> 워크플로우 목록 및 상태 확인</li>
+                <li><strong>Graph View:</strong> DAG의 태스크 의존성 시각화</li>
+                <li><strong>Tree View:</strong> 시간순 실행 이력 확인</li>
+                <li><strong>Logs:</strong> 각 태스크의 실행 로그</li>
+            </ul>
+        </div>
+
+        <h4>2. DAG 실행 및 모니터링</h4>
+        <div class="execution-box">
+            <pre><code># DAG 수동 실행 (UI에서)
+# 1. DAGs 페이지에서 movie_data_collection DAG 클릭
+# 2. 우측 상단 "Trigger DAG" 버튼 클릭
+# 3. Graph View에서 실행 상태 실시간 확인
+
+# API를 통한 DAG 실행
+curl -X POST "http://localhost:8080/api/v1/dags/movie_data_collection/dagRuns" \
+     -H "Content-Type: application/json" \
+     -u admin:admin \
+     -d '{"conf": {}}'</code></pre>
+        </div>
+
+        <h4>3. 데이터 수집 결과 확인</h4>
+        <div class="execution-box">
+            <pre><code># 수집된 원시 데이터 확인
+ls -la data/raw/tmdb/
+cat data/raw/tmdb/popular.json | jq '.movies[0]'
+
+# 처리된 데이터 확인
+ls -la data/processed/
+head data/processed/watch_log.csv</code></pre>
+        </div>
+
+        <div class="checklist">
+            <h4><span class="emoji">✅</span> 핵심 확인 포인트</h4>
+            <ul>
+                <li>✅ TMDB API에서 영화 데이터 수집 완료</li>
+                <li>✅ 데이터 전처리 및 watch_log.csv 생성</li>
+                <li>✅ Airflow UI에서 DAG 실행 상태 녹색으로 표시</li>
+                <li>✅ 실패 시 자동 재시도 메커니즘 동작</li>
+            </ul>
+        </div>
+
+        <div class="troubleshooting">
+            <h4><span class="emoji">🚨</span> 문제 해결</h4>
+            <pre><code># Airflow 컨테이너 로그 확인
+docker logs movie-mlops-airflow
+
+# 태스크 실패 시 로그 확인 방법
+# Airflow UI > Graph View > 실패한 태스크 클릭 > Logs 탭</code></pre>
+        </div>
+
+        <h2 id="arch2"><span class="emoji">📦</span> 2아키텍처: 자재 창고 건설 (Feast)</h2>
+        
+        <div class="house-analogy hover-lift">
+            <h3><span class="emoji">🏗️</span> 집 짓기 비유</h3>
+            <p><strong>"건축 자재들을 체계적으로 보관할 창고 건설"</strong></p>
+            <p>피처 스토어는 건축 자재 창고와 같습니다. 다양한 자재(피처)들을 종류별로 
+            정리해서 보관하고, 필요할 때 언제든 빠르게 꺼내 쓸 수 있도록 관리하는 
+            체계적인 저장소입니다.</p>
+        </div>
+
+        <h3><span class="emoji">📚</span> 개념 설명</h3>
+        <div class="concept-box hover-lift">
+            <h4>피처 스토어란?</h4>
+            <ul>
+                <li>ML 모델이 사용하는 피처(Feature)들을 중앙에서 관리하는 시스템</li>
+                <li>일관된 피처 정의와 재사용성 보장</li>
+                <li>실시간 서빙과 배치 처리 모두 지원</li>
+            </ul>
+
+            <h4>Feast란?</h4>
+            <ul>
+                <li>오픈소스 피처 스토어 플랫폼</li>
+                <li>피처 정의, 저장, 서빙을 통합 관리</li>
+                <li>다양한 데이터 소스와 저장소 지원</li>
+            </ul>
+        </div>
+
+        <h3><span class="emoji">🔧</span> 실행 방법</h3>
+        <div class="execution-box">
+            <h4>개별 실행</h4>
+            <pre><code># Redis와 Feast 서비스 시작
+docker compose -f docker/docker-compose.redis.yml up -d
+docker compose -f docker/docker-compose.feast.yml up -d</code></pre>
+
+            <h4>ML 스택으로 실행</h4>
+            <pre><code>./run_movie_mlops.sh
+# 메뉴에서 6번 선택 (ML 스택)</code></pre>
+        </div>
+        <h3><span class="emoji">🎯</span> Feast 사용 방법</h3>
+        
+        <h4>1. 피처 스토어 초기화</h4>
+        <div class="execution-box">
+            <pre><code># Feast 컨테이너 접속
+docker exec -it movie-mlops-feast bash
+cd /app/feast_repo
+
+# 피처 정의 적용
+feast apply</code></pre>
+        </div>
+
+        <h4>2. 피처 정의 확인</h4>
+        <div class="execution-box">
+            <pre><code># 피처 뷰 목록 확인
+feast feature-views list
+
+# 엔티티 목록 확인
+feast entities list
+
+# 피처 서비스 목록 확인
+feast feature-services list</code></pre>
+        </div>
+
+        <h4>3. 피처 서빙 테스트</h4>
+        <div class="execution-box">
+            <pre><code># Python을 통한 온라인 피처 조회
+python3 -c """
+from feast import FeatureStore
+import pandas as pd
+
+# 피처 스토어 연결
+fs = FeatureStore(repo_path='.')
+
+# 온라인 피처 조회
+features = fs.get_online_features(
+    features=[
+        'movie_features:rating',
+        'movie_features:popularity',
+        'user_features:age',
+        'user_features:genre_preference'
+    ],
+    entity_rows=[
+        {'movie_id': 1, 'user_id': 1},
+        {'movie_id': 2, 'user_id': 1}
+    ]
+)
+
+# 결과 출력
+result_df = features.to_df()
+print('피처 조회 결과:')
+print(result_df)
+"""</code></pre>
+        </div>
+
+        <h4>4. Feast UI 접속</h4>
+        <div class="execution-box">
+            <pre><code># Feast 웹 UI 접속
+open http://localhost:6566</code></pre>
+        </div>
+
+        <h3><span class="emoji">🌐</span> API를 통한 피처 조회</h3>
+        
+        <h4>개별 피처 조회</h4>
+        <div class="execution-box">
+            <pre><code># 특정 영화의 피처 조회
+curl -X GET "http://localhost:8000/api/v1/features/movie/123" \
+     -H "Content-Type: application/json"</code></pre>
+        </div>
+
+        <h4>배치 피처 조회</h4>
+        <div class="execution-box">
+            <pre><code># 여러 엔티티의 피처 일괄 조회
+curl -X POST "http://localhost:8000/api/v1/features/batch" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "entity_ids": [1, 2, 3, 4, 5],
+       "features": ["rating", "popularity", "genre"],
+       "entity_type": "movie"
+     }'</code></pre>
+        </div>
+
+        <div class="checklist">
+            <h4><span class="emoji">✅</span> 핵심 확인 포인트</h4>
+            <ul>
+                <li>✅ 피처 정의가 Feast에 정상 등록</li>
+                <li>✅ 온라인 피처 서빙 정상 동작</li>
+                <li>✅ 배치 피처 조회 가능</li>
+                <li>✅ Feast UI에서 피처 메타데이터 확인</li>
+            </ul>
+        </div>
+
+        <div class="final-message">
+            <h3><span class="emoji">🌟</span> MLOps의 미래를 함께 만들어 갑시다! <span class="emoji">🌟</span></h3>
+            <p>"The best way to predict the future is to create it." - Peter Drucker</p>
+            <p><strong>🚀 Happy MLOps Journey! 🚀</strong></p>
+        </div>
+    </div>
+</body>
+</html>
