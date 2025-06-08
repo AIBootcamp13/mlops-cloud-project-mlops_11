@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>기존 프로젝트 단계별 마이그레이션 가이드</title>
+    <meta name="description" content="my-mlops와 my-mlops-web 프로젝트를 MLOps 9아키텍처 시스템으로 단계별 마이그레이션하는 구체적인 가이드">
+    <meta name="author" content="MLOps Project Team">
+    <meta name="created" content="2025-06-08">
+    <meta name="modified" content="2025-06-08">
+    <meta name="version" content="1.0">
+    <meta name="keywords" content="MLOps, Migration, Legacy, Project Integration, Code Transfer, PyTorch, Airflow">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #e74c3c;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+            border-left: 4px solid #e74c3c;
+            padding-left: 15px;
+        }
+        h3 {
+            color: #2c3e50;
+            margin-top: 25px;
+        }
+        .stage-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .stage-table th,
+        .stage-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        .stage-table th {
+            background-color: #e74c3c;
+            color: white;
+        }
+        .stage-table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .migration-box {
+            background: #fff5f5;
+            border: 2px solid #e74c3c;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+        .stage-box {
+            background: #f0f8ff;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+        .code-block {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+            overflow-x: auto;
+            white-space: pre;
+        }
+        .file-tree {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+            white-space: pre-line;
+        }
+        .priority-high {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .priority-medium {
+            color: #f39c12;
+            font-weight: bold;
+        }
+        .priority-low {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        .status-exists {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        .status-partial {
+            color: #f39c12;
+            font-weight: bold;
+        }
+        .status-missing {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .checklist {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .checklist input[type="checkbox"] {
+            margin-right: 8px;
+        }
+        .highlight-box {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .warning-box {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .emoji {
+            font-size: 1.2em;
+        }
+        .timeline {
+            background: #e8f4fd;
+            border: 1px solid #bee5eb;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><span class="emoji">🔄</span> 기존 프로젝트 단계별 마이그레이션 가이드</h1>
+
+        <h2>개요</h2>
+        <p>이 가이드는 기존의 <code>my-mlops</code> (백엔드)와 <code>my-mlops-web</code> (프론트엔드) 프로젝트를 새로운 MLOps 9아키텍처 시스템으로 효율적으로 마이그레이션하는 방법을 제시합니다. 4단계 통합 구현 전략에 따라 언제, 어떻게 기존 코드를 이전할지에 대한 구체적인 계획을 다룹니다.</p>
+
+        <h2><span class="emoji">🔍</span> 기존 프로젝트 분석 결과</h2>
+
+        <h3><span class="emoji">📊</span> my-mlops (백엔드) 구성요소</h3>
+        <div class="file-tree">
+my-mlops/
+├── data-prepare/           # 데이터 수집 및 전처리
+│   ├── crawler.py         # TMDB API 크롤러
+│   ├── preprocessing.py   # 데이터 전처리 로직
+│   ├── main.py           # 데이터 준비 실행
+│   └── result/           # 크롤링 결과
+├── mlops/
+│   ├── dataset/          # 원시 데이터셋
+│   └── src/              # ML 소스코드
+│       ├── dataset/      # 데이터 로더
+│       ├── model/        # NumPy 기반 ML 모델
+│       ├── train/        # 훈련 로직
+│       ├── evaluate/     # 평가 로직
+│       └── utils/        # 유틸리티
+        </div>
+
+        <h3><span class="emoji">🌐</span> my-mlops-web (프론트엔드) 구성요소</h3>
+        <div class="file-tree">
+my-mlops-web/
+├── src/
+│   ├── App.jsx           # 메인 앱 컴포넌트
+│   ├── api.js            # 백엔드 API 통신
+│   ├── components/
+│   │   └── CardGrid.jsx  # 영화 카드 그리드
+│   └── poster.json       # 기본 영화 ID 목록
+├── package.json          # React 의존성
+└── .env                  # API 엔드포인트 설정
+        </div>
+
+        <h3><span class="emoji">🎯</span> 현재 아키텍처 매핑</h3>
+        <table class="stage-table">
+            <thead>
+                <tr>
+                    <th>MLOps 아키텍처</th>
+                    <th>기존 구현 상태</th>
+                    <th>기존 코드 위치</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>1아키텍처</strong>: 데이터 파이프라인</td>
+                    <td><span class="status-partial">⚠️ 수동 실행</span></td>
+                    <td><code>data-prepare/</code></td>
+                </tr>
+                <tr>
+                    <td><strong>2아키텍처</strong>: 피처 스토어</td>
+                    <td><span class="status-missing">❌ 없음</span></td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td><strong>3아키텍처</strong>: 버전 관리</td>
+                    <td><span class="status-exists">✅ Git 저장소</span></td>
+                    <td><code>.git/</code></td>
+                </tr>
+                <tr>
+                    <td><strong>4아키텍처</strong>: CI/CD</td>
+                    <td><span class="status-missing">❌ 없음</span></td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td><strong>5아키텍처</strong>: 워크플로우 오케스트레이션</td>
+                    <td><span class="status-missing">❌ 없음</span></td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td><strong>6아키텍처</strong>: 모델 레지스트리</td>
+                    <td><span class="status-missing">❌ 없음</span></td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td><strong>7아키텍처</strong>: ML 프레임워크</td>
+                    <td><span class="status-partial">⚠️ NumPy 기반</span></td>
+                    <td><code>mlops/src/model/</code></td>
+                </tr>
+                <tr>
+                    <td><strong>8아키텍처</strong>: 모니터링</td>
+                    <td><span class="status-missing">❌ 없음</span></td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td><strong>9아키텍처</strong>: 이벤트 기반</td>
+                    <td><span class="status-missing">❌ 없음</span></td>
+                    <td>-</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2><span class="emoji">📅</span> 4단계 통합 구현 전략에 따른 마이그레이션 계획</h2>
+
+        <h3><span class="emoji">🎯</span> 단계별 이전 타이밍</h3>
+        <table class="stage-table">
+            <thead>
+                <tr>
+                    <th>구현 단계</th>
+                    <th>이전 대상</th>
+                    <th>이전 시기</th>
+                    <th>주요 변환 작업</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>1단계</strong>: Git 생태계</td>
+                    <td>없음</td>
+                    <td>-</td>
+                    <td>Git + GitHub Actions 신규 구축</td>
+                </tr>
+                <tr>
+                    <td><strong>2단계</strong>: Airflow 생태계</td>
+                    <td><span class="emoji">📦</span> <code>data-prepare/</code></td>
+                    <td>Airflow 구축 시</td>
+                    <td>수동 크롤링 → DAG 자동화</td>
+                </tr>
+                <tr>
+                    <td><strong>3단계</strong>: ML 도구 트리오</td>
+                    <td><span class="emoji">🤖</span> <code>mlops/</code> + <span class="emoji">🌐</span> <code>web/</code></td>
+                    <td>ML 도구 구축 시</td>
+                    <td>NumPy→PyTorch + React 통합</td>
+                </tr>
+                <tr>
+                    <td><strong>4단계</strong>: 운영 도구들</td>
+                    <td>없음</td>
+                    <td>-</td>
+                    <td>모니터링 + 이벤트 신규 구축</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2><span class="emoji">🔄</span> 단계별 상세 마이그레이션 가이드</h2>
+
+        <div class="stage-box">
+            <h3><strong>1단계: 기반 인프라 구축 (1-2주)</strong></h3>
+            
+            <h4><span class="emoji">📋</span> 작업 내용</h4>
+            <ul>
+                <li>Git + GitHub + GitHub Actions 환경 설정</li>
+                <li>기본 프로젝트 구조 생성</li>
+                <li>Docker 기초 환경 구성</li>
+            </ul>
+
+            <h4><span class="emoji">🔧</span> 기존 코드 이전</h4>
+            <p><strong>이전 대상</strong>: 없음 (신규 구축)</p>
+            
+            <div class="code-block">
+# 1단계에서는 기존 코드 이전 없이 새로 구축
+mkdir -p movie-mlops
+cd movie-mlops
+
+# Git 환경 설정
+git init
+git remote add origin &lt;repository-url&gt;
+
+# 기본 구조 생성
+mkdir -p {src,scripts,tests,docker,config,data,docs}
+            </div>
+        </div>
+
+        <div class="stage-box">
+            <h3><strong>2단계: 핵심 파이프라인 구축 (2-3주)</strong></h3>
+            
+            <h4><span class="emoji">📦</span> 데이터 관련 코드 이전</h4>
+
+            <h5>이전 대상 파일들</h5>
+            <div class="file-tree">
+# 원본 위치 → 목표 위치
+my-mlops/data-prepare/
+├── crawler.py          → src\data\crawlers\tmdb_crawler.py
+├── preprocessing.py    → src\data\processors\tmdb_processor.py  
+├── main.py            → scripts\data\run_data_collection.py
+├── .env               → .env (통합)
+└── result\            → data\raw\tmdb\
+            </div>
+
+            <h5>구체적인 이전 스크립트</h5>
+            <div class="code-block">
+# scripts/migration/migrate_stage_2.sh
+#!/bin/bash
+echo "📦 2단계: 데이터 파이프라인 코드 이전 시작..."
+
+# 데이터 관련 디렉터리 생성
+mkdir -p src/data/{crawlers,processors,loaders}
+mkdir -p data/{raw,processed}/tmdb
+mkdir -p scripts/data
+
+# 기존 데이터 수집 코드 복사
+cp C:/dev/my-mlops/data-prepare/crawler.py src/data/crawlers/tmdb_crawler.py
+cp C:/dev/my-mlops/data-prepare/preprocessing.py src/data/processors/tmdb_processor.py
+cp C:/dev/my-mlops/data-prepare/main.py scripts/data/run_data_collection.py
+
+# 환경 변수 통합
+cat C:/dev/my-mlops/data-prepare/.env >> .env
+
+# 데이터 결과 복사
+cp -r C:/dev/my-mlops/data-prepare/result/* data/raw/tmdb/
+
+echo "✅ 2단계 이전 완료"
+            </div>
+
+            <h5>주요 변환 작업</h5>
+            
+            <p><strong>기존 수동 실행:</strong></p>
+            <div class="code-block">
+# data-prepare/main.py
+def run_popular_movie_crawler():
+    tmdb_crawler = TMDBCrawler()
+    result = tmdb_crawler.get_bulk_popular_movies(start_page=1, end_page=1)
+    tmdb_crawler.save_movies_to_json_file(result, "./result", "popular")
+            </div>
+
+            <p><strong>새로운 Airflow DAG:</strong></p>
+            <div class="code-block"># airflow/dags/movie_data_pipeline.py
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from src.data.crawlers.tmdb_crawler import TMDBCrawler
+
+def crawl_tmdb_data(**context):
+    crawler = TMDBCrawler()
+    result = crawler.get_bulk_popular_movies(start_page=1, end_page=1)
+    return result
+
+def process_movie_data(**context):
+    # 기존 preprocessing.py 로직 재사용
+    pass
+
+dag = DAG(
+    'movie_data_pipeline',
+    default_args=default_args,
+    description='영화 데이터 수집 및 처리 파이프라인',
+    schedule_interval=timedelta(days=1),
+    start_date=datetime(2025, 6, 8),
+    catchup=False
+)
+
+crawl_task = PythonOperator(
+    task_id='crawl_tmdb_data',
+    python_callable=crawl_tmdb_data,
+    dag=dag
+)
+
+process_task = PythonOperator(
+    task_id='process_movie_data',
+    python_callable=process_movie_data,
+    dag=dag
+)
+
+crawl_task >> process_task</div>
+        </div>
+
+        <div class="stage-box">
+            <h3><strong>3단계: ML 핵심 도구들 구축 (3-4주, 병렬)</strong></h3>
+            
+            <h4><span class="emoji">🤖</span> ML 모델 + 웹앱 코드 이전</h4>
+
+            <h5>이전 대상 파일들</h5>
+            <div class="file-tree">
+# ML 모델 관련
+my-mlops/mlops/
+├── src\model\          → src\models\pytorch\ (NumPy→PyTorch 전환)
+├── src\dataset\        → src\data\datasets\
+├── src\train\          → src\training\
+├── src\evaluate\       → src\evaluation\
+├── src\utils\          → src\utils\
+└── dataset\            → data\processed\
+
+# 프론트엔드 관련
+my-mlops-web/
+├── src\                → src\frontend\react\
+├── package.json        → src\frontend\package.json
+├── .env               → .env (통합)
+└── public\            → src\frontend\public\
+            </div>
+
+            <h5>구체적인 이전 스크립트</h5>
+            <div class="code-block">
+# scripts/migration/migrate_stage_3.sh  
+#!/bin/bash
+echo "🤖 3단계: ML 도구 + 웹앱 코드 이전 시작..."
+
+# ML 관련 디렉터리 생성
+mkdir -p src/{models,training,evaluation,utils}
+mkdir -p src/data/datasets
+mkdir -p src/frontend
+
+# ML 코드 복사
+cp -r C:/dev/my-mlops/mlops/src/* src/
+mv src/model src/models/legacy  # NumPy 버전 보존
+mv src/train src/training  
+mv src/evaluate src/evaluation
+
+# 새로운 PyTorch 모델 디렉터리 생성
+mkdir -p src/models/pytorch
+
+# React 앱 복사
+cp -r C:/dev/my-mlops-web/* src/frontend/
+
+# 데이터셋 이동
+cp -r C:/dev/my-mlops/mlops/dataset/* data/processed/
+
+# 환경 변수 통합
+cat C:/dev/my-mlops-web/.env >> .env
+
+echo "✅ 3단계 이전 완료"
+            </div>
+
+            <h5>주요 변환 작업</h5>
+            
+            <p><strong>1) NumPy 모델 → PyTorch 모델 전환</strong></p>
+            
+            <p><strong>기존 NumPy 모델:</strong></p>
+            <div class="code-block">
+# src/models/legacy/movie_predictor.py
+import numpy as np
+
+class MoviePredictor:
+    def __init__(self, input_dim, hidden_dim, num_classes):
+        self.weights1 = np.random.randn(input_dim, hidden_dim) * 0.01
+        self.bias1 = np.zeros((1, hidden_dim))
+        self.weights2 = np.random.randn(hidden_dim, num_classes) * 0.01
+        self.bias2 = np.zeros((1, num_classes))
+
+    def forward(self, x):
+        self.z1 = np.dot(x, self.weights1) + self.bias1
+        self.a1 = self.relu(self.z1)
+        self.z2 = np.dot(self.a1, self.weights2) + self.bias2
+        self.output = self.softmax(self.z2)
+        return self.output
+            </div>
+
+            <p><strong>새로운 PyTorch 모델:</strong></p>
+            <div class="code-block">
+# src/models/pytorch/movie_predictor.py
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class MoviePredictor(nn.Module):
+    def __init__(self, input_dim, hidden_dim, num_classes):
+        super(MoviePredictor, self).__init__()
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, num_classes)
+        self.dropout = nn.Dropout(0.2)
+        
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = self.fc2(x)
+        return F.log_softmax(x, dim=1)
+            </div>
+
+            <p><strong>2) 데이터 로더 PyTorch 전환</strong></p>
+            
+            <p><strong>기존 SimpleDataLoader:</strong></p>
+            <div class="code-block">
+# src/data/datasets/legacy/data_loader.py
+class SimpleDataLoader:
+    def __init__(self, features, labels, batch_size=32, shuffle=True):
+        self.features = features
+        self.labels = labels
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+            </div>
+
+            <p><strong>새로운 PyTorch Dataset:</strong></p>
+            <div class="code-block">
+# src/data/datasets/movie_dataset.py
+import torch
+from torch.utils.data import Dataset, DataLoader
+
+class MovieDataset(Dataset):
+    def __init__(self, features, labels):
+        self.features = torch.FloatTensor(features)
+        self.labels = torch.LongTensor(labels)
+    
+    def __len__(self):
+        return len(self.features)
+    
+    def __getitem__(self, idx):
+        return self.features[idx], self.labels[idx]
+
+def get_data_loaders(train_dataset, val_dataset, test_dataset, batch_size=64):
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    return train_loader, val_loader, test_loader
+            </div>
+
+            <p><strong>3) React 앱과 MLflow 연동</strong></p>
+            
+            <p><strong>기존 API 통신:</strong></p>
+            <div class="code-block">
+// src/frontend/src/api.js
+const API_ENDPOINT = process.env.REACT_APP_API_ENDPOINT;
+
+export async function getRecommendContents(k) {
+  const response = await axios.get(`${API_ENDPOINT}`, {
+    params: { k: k },
+  });
+  return response.data.recommended_content_id;
+}
+            </div>
+
+            <p><strong>새로운 MLflow 연동 API:</strong></p>
+            <div class="code-block">
+// src/frontend/src/api.js
+const API_ENDPOINT = process.env.REACT_APP_API_ENDPOINT || 'http://localhost:8000';
+const MLFLOW_ENDPOINT = process.env.REACT_APP_MLFLOW_ENDPOINT || 'http://localhost:5000';
+
+export async function getRecommendContents(k) {
+  try {
+    const response = await axios.get(`${API_ENDPOINT}/predict`, {
+      params: { k: k },
+    });
+    return response.data.recommended_content_id;
+  } catch (error) {
+    console.error('API Error:', error);
+    return [];
+  }
+}
+
+export async function getModelInfo() {
+  const response = await axios.get(`${MLFLOW_ENDPOINT}/api/2.0/mlflow/registered-models/get`, {
+    params: { name: 'movie-predictor' },
+  });
+  return response.data;
+}
+            </div>
+        </div>
+
+        <div class="stage-box">
+            <h3><strong>4단계: 운영 및 자동화 (2-3주)</strong></h3>
+            
+            <h4><span class="emoji">📊</span> 작업 내용</h4>
+            <ul>
+                <li>Prometheus + Grafana 모니터링 시스템 구축</li>
+                <li>Apache Kafka 이벤트 기반 자동화 시스템 구축</li>
+            </ul>
+
+            <h4><span class="emoji">🔧</span> 기존 코드 이전</h4>
+            <p><strong>이전 대상</strong>: 없음 (신규 구축)</p>
+            
+            <div class="code-block">
+# 4단계에서는 기존 코드 이전 없이 새로 구축
+mkdir -p docker/monitoring
+mkdir -p config/{prometheus,grafana,kafka}
+mkdir -p scripts/{monitoring,events}
+            </div>
+        </div>
+
+        <h2><span class="emoji">🛠️</span> 통합 마이그레이션 스크립트</h2>
+
+        <h3><strong>전체 마이그레이션 자동화 스크립트</strong></h3>
+        <div class="code-block">
+# scripts/migration/migrate_all_stages.sh
+#!/bin/bash
+
+echo "🚀 전체 프로젝트 마이그레이션 시작..."
+
+# 1단계: 기반 구조 생성
+echo "📁 1단계: 기반 구조 생성 중..."
+mkdir -p {src,scripts,tests,docker,config,data,docs,airflow,logs,models}
+mkdir -p src/{data,models,training,evaluation,utils,frontend,api,features}
+mkdir -p scripts/{migration,setup,test,deploy,data,monitoring}
+mkdir -p tests/{unit,integration,e2e}
+mkdir -p docker/{dockerfiles,configs}
+mkdir -p data/{raw,processed}/{tmdb,features,models}
+
+# 2단계: 데이터 파이프라인 코드 이전
+echo "📦 2단계: 데이터 파이프라인 코드 이전 중..."
+if [ -d "C:/dev/my-mlops/data-prepare" ]; then
+    cp C:/dev/my-mlops/data-prepare/crawler.py src/data/crawlers/tmdb_crawler.py
+    cp C:/dev/my-mlops/data-prepare/preprocessing.py src/data/processors/tmdb_processor.py
+    cp C:/dev/my-mlops/data-prepare/main.py scripts/data/run_data_collection.py
+    [ -f "C:/dev/my-mlops/data-prepare/.env" ] && cat C:/dev/my-mlops/data-prepare/.env >> .env
+    [ -d "C:/dev/my-mlops/data-prepare/result" ] && cp -r C:/dev/my-mlops/data-prepare/result/* data/raw/tmdb/ 2>/dev/null || true
+    echo "✅ 데이터 파이프라인 코드 이전 완료"
+else
+    echo "⚠️ my-mlops/data-prepare 디렉터리를 찾을 수 없습니다"
+fi
+
+# 3단계: ML 모델 + 웹앱 코드 이전
+echo "🤖 3단계: ML 모델 + 웹앱 코드 이전 중..."
+if [ -d "C:/dev/my-mlops/mlops" ]; then
+    cp -r C:/dev/my-mlops/mlops/src/* src/ 2>/dev/null || true
+    mv src/model src/models/legacy 2>/dev/null || true
+    mv src/train src/training 2>/dev/null || true
+    mv src/evaluate src/evaluation 2>/dev/null || true
+    mkdir -p src/models/pytorch
+    [ -d "C:/dev/my-mlops/mlops/dataset" ] && cp -r C:/dev/my-mlops/mlops/dataset/* data/processed/ 2>/dev/null || true
+    echo "✅ ML 모델 코드 이전 완료"
+else
+    echo "⚠️ my-mlops/mlops 디렉터리를 찾을 수 없습니다"
+fi
+
+if [ -d "C:/dev/my-mlops-web" ]; then
+    cp -r C:/dev/my-mlops-web/* src/frontend/ 2>/dev/null || true
+    [ -f "C:/dev/my-mlops-web/.env" ] && cat C:/dev/my-mlops-web/.env >> .env
+    echo "✅ React 웹앱 코드 이전 완료"
+else
+    echo "⚠️ my-mlops-web 디렉터리를 찾을 수 없습니다"
+fi
+
+# 기본 설정 파일 생성
+echo "⚙️ 기본 설정 파일 생성 중..."
+[ ! -f ".env" ] && touch .env
+[ ! -f "requirements.txt" ] && touch requirements.txt
+[ ! -f "pyproject.toml" ] && touch pyproject.toml
+[ ! -f "README.md" ] && echo "# Movie MLOps Project" > README.md
+
+echo "🎉 전체 마이그레이션 완료!"
+echo ""
+echo "📋 다음 단계:"
+echo "1. NumPy 모델을 PyTorch로 전환"
+echo "2. Airflow DAG 작성" 
+echo "3. Docker 환경 설정"
+echo "4. 테스트 코드 작성"
+        </div>
+
+        <h2><span class="emoji">📋</span> 단계별 검증 체크리스트</h2>
+
+        <div class="checklist">
+            <h3><strong>2단계 완료 검증</strong></h3>
+            <input type="checkbox"> 데이터 크롤러 코드가 <code>src/data/crawlers/</code>에 위치<br>
+            <input type="checkbox"> 전처리 로직이 <code>src/data/processors/</code>에 위치<br>
+            <input type="checkbox"> 기존 결과 데이터가 <code>data/raw/tmdb/</code>에 저장<br>
+            <input type="checkbox"> 환경 변수가 <code>.env</code>에 통합<br>
+            <input type="checkbox"> Airflow DAG가 정상 동작
+        </div>
+
+        <div class="checklist">
+            <h3><strong>3단계 완료 검증</strong></h3>
+            <input type="checkbox"> NumPy 모델이 <code>src/models/legacy/</code>에 백업<br>
+            <input type="checkbox"> PyTorch 모델이 <code>src/models/pytorch/</code>에 구현<br>
+            <input type="checkbox"> 데이터 로더가 PyTorch Dataset으로 전환<br>
+            <input type="checkbox"> React 앱이 <code>src/frontend/</code>에 위치<br>
+            <input type="checkbox"> 로컬 API 서버가 정상 동작<br>
+            <input type="checkbox"> MLflow와 연동 테스트 완료
+        </div>
+
+        <div class="checklist">
+            <h3><strong>통합 테스트</strong></h3>
+            <input type="checkbox"> 전체 파이프라인 E2E 테스트 통과<br>
+            <input type="checkbox"> Docker 환경에서 정상 동작<br>
+            <input type="checkbox"> CI/CD 파이프라인 통과<br>
+            <input type="checkbox"> 성능 벤치마크 달성
+        </div>
+
+        <h2><span class="emoji">🚨</span> 주의사항 및 롤백 계획</h2>
+
+        <h3><strong>백업 전략</strong></h3>
+        <div class="code-block">
+# 마이그레이션 전 백업 생성
+cp -r C:/dev/my-mlops C:/dev/backups/my-mlops-$(date +%Y%m%d)
+cp -r C:/dev/my-mlops-web C:/dev/backups/my-mlops-web-$(date +%Y%m%d)
+        </div>
+
+        <h3><strong>롤백 계획</strong></h3>
+        <div class="code-block">
+# scripts/migration/rollback.sh
+#!/bin/bash
+echo "🔄 마이그레이션 롤백 시작..."
+
+BACKUP_DATE=${1:-$(date +%Y%m%d)}
+BACKUP_DIR="C:/dev/backups"
+
+if [ -d "$BACKUP_DIR/my-mlops-$BACKUP_DATE" ]; then
+    echo "📦 백업에서 my-mlops 복원 중..."
+    rm -rf C:/dev/my-mlops
+    cp -r $BACKUP_DIR/my-mlops-$BACKUP_DATE C:/dev/my-mlops
+fi
+
+if [ -d "$BACKUP_DIR/my-mlops-web-$BACKUP_DATE" ]; then
+    echo "🌐 백업에서 my-mlops-web 복원 중..."
+    rm -rf C:/dev/my-mlops-web  
+    cp -r $BACKUP_DIR/my-mlops-web-$BACKUP_DATE C:/dev/my-mlops-web
+fi
+
+echo "✅ 롤백 완료"
+        </div>
+
+        <h3><strong>위험 요소 및 대응책</strong></h3>
+        <div class="warning-box">
+            <ol>
+                <li><strong>NumPy → PyTorch 전환 실패</strong>: 기존 NumPy 모델을 <code>legacy/</code>에 보존</li>
+                <li><strong>React 앱 통합 문제</strong>: 독립적인 프론트엔드 프로젝트로 유지 가능</li>
+                <li><strong>데이터 손실</strong>: 마이그레이션 전 전체 백업 필수</li>
+                <li><strong>환경 변수 충돌</strong>: 기존 <code>.env</code> 파일들을 단계별로 통합</li>
+            </ol>
+        </div>
+
+        <h2><span class="emoji">🎯</span> 마이그레이션 성공 지표</h2>
+
+        <h3><strong>정량적 지표</strong></h3>
+        <div class="highlight-box">
+            <ul>
+                <li><strong>코드 재사용률</strong>: 기존 코드의 80% 이상 재활용</li>
+                <li><strong>성능 유지</strong>: PyTorch 전환 후 동등한 모델 성능 달성</li>
+                <li><strong>테스트 커버리지</strong>: 새로운 구조에서 90% 이상 테스트 커버리지</li>
+                <li><strong>빌드 시간</strong>: 전체 파이프라인 실행 시간 30분 이내</li>
+            </ul>
+        </div>
+
+        <h3><strong>정성적 지표</strong></h3>
+        <div class="highlight-box">
+            <ul>
+                <li><strong>개발 생산성</strong>: 새로운 기능 추가가 더 용이함</li>
+                <li><strong>유지보수성</strong>: 코드 구조가 더 명확하고 모듈화됨</li>
+                <li><strong>확장성</strong>: MLOps 도구 추가가 더 쉬워짐</li>
+                <li><strong>안정성</strong>: 자동화된 테스트와 CI/CD로 안정성 향상</li>
+            </ul>
+        </div>
+
+        <h2><span class="emoji">📚</span> 관련 문서</h2>
+        <ul>
+            <li><a href="./0.mlops-architecture-complete-9stages.md">MLOps 9아키텍처 완전 가이드</a></li>
+            <li><a href="./2.mlops-architecture-efficient-implementation-strategy.md">효율적 구현 전략</a></li>
+            <li><a href="./8.directory-structure.md">디렉터리 구조 표준</a></li>
+            <li><a href="../docker/">Docker 환경 가이드</a></li>
+            <li><a href="../testing/">테스트 전략 문서</a></li>
+        </ul>
+
+        <h2>결론</h2>
+        <p>이 단계별 마이그레이션 가이드를 통해 기존의 <code>my-mlops</code>와 <code>my-mlops-web</code> 프로젝트를 체계적으로 새로운 MLOps 아키텍처로 전환할 수 있습니다.</p>
+
+        <div class="highlight-box">
+            <p><strong>핵심 포인트:</strong></p>
+            <ol>
+                <li><strong>2단계</strong>에서 데이터 파이프라인 코드를 먼저 이전하여 Airflow 기반 자동화 구축</li>
+                <li><strong>3단계</strong>에서 ML 모델과 React 앱을 함께 이전하여 통합 개발 환경 구성</li>
+                <li><strong>점진적 전환</strong>을 통해 위험을 최소화하고 안정성 확보</li>
+                <li><strong>기존 자산 최대 활용</strong>으로 개발 효율성 극대화</li>
+            </ol>
+            <p>이렇게 하면 검증된 코드를 재사용하면서도 현대적인 MLOps 시스템을 효율적으로 구축할 수 있습니다! <span class="emoji">🚀</span></p>
+        </div>
+
+        <hr>
+        <p style="text-align: center; font-style: italic; color: #7f8c8d;">
+            <em>"기존의 자산을 소중히 여기되, 새로운 아키텍처로 발전시키자!"</em> <span class="emoji">💫</span>
+        </p>
+    </div>
+</body>
+</html>
