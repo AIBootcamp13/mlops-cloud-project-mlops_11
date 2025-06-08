@@ -3,8 +3,6 @@
 # WSL Docker 환경용
 # ==============================================================================
 
-version: '3.8'
-
 services:
   redis:
     image: ${REDIS_IMAGE:-redis:7-alpine}

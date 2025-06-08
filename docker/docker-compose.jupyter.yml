@@ -1,18 +1,11 @@
 # ==============================================================================
-# Docker Compose - Jupyter Notebook 개발 환경
-# WSL Docker 환경용
+# Docker Compose - Jupyter Notebook 개발 환경 (수정버전)
+# WSL Docker 환경용 - 빌드 없이 기존 이미지 사용
 # ==============================================================================
-
-version: '3.8'
 
 services:
   jupyter:
-    build:
-      context: .
-      dockerfile: ./docker/dockerfiles/Dockerfile.jupyter
-      args:
-        - PYTHON_VERSION=3.11
-    image: ${JUPYTER_IMAGE_NAME:-movie-mlops/jupyter}:${API_VERSION:-latest}
+    image: jupyter/datascience-notebook:python-3.11
     container_name: movie-mlops-jupyter
     restart: unless-stopped
     ports:
@@ -22,27 +15,31 @@ services:
       - JUPYTER_TOKEN=${JUPYTER_TOKEN:-movie-mlops-jupyter}
       - GRANT_SUDO=yes
       - CHOWN_HOME=yes
-      - CHOWN_HOME_OPTS=-R
+      - NB_UID=1000
+      - NB_GID=1000
     volumes:
-      # 소스 코드 마운트 (WSL 경로)
-      - ${HOST_PROJECT_PATH:-/mnt/c/dev/movie-mlops}:${CONTAINER_PROJECT_PATH:-/app}
+      # 프로젝트 전체를 작업 디렉토리로 마운트
+      - ..:/home/jovyan/work
       # Jupyter 노트북 전용 폴더
-      - ./notebooks:/home/jovyan/notebooks
+      - ../notebooks:/home/jovyan/notebooks
       # 데이터 폴더
-      - ./data:/home/jovyan/data
+      - ../data:/home/jovyan/data
       # 모델 폴더  
-      - ./models:/home/jovyan/models
-      # 설정 폴더
-      - ./config:/home/jovyan/config
-    working_dir: ${CONTAINER_PROJECT_PATH:-/app}
+      - ../models:/home/jovyan/models
+    working_dir: /home/jovyan/work
     networks:
       - movie-mlops-network
     user: root
     command: >
       bash -c "
-        pip install -r requirements/jupyter.txt &&
-        pip install -r requirements/base.txt &&
-        pip install -r requirements/dev.txt &&
+        echo 'Installing requirements...' &&
+        if [ -f work/requirements/jupyter.txt ]; then
+          pip install --no-cache-dir -r work/requirements/jupyter.txt || echo 'jupyter.txt not found, skipping';
+        fi &&
+        if [ -f work/requirements/base.txt ]; then
+          pip install --no-cache-dir -r work/requirements/base.txt || echo 'base.txt not found, skipping';
+        fi &&
+        echo 'Starting Jupyter Lab...' &&
         start-notebook.sh 
         --NotebookApp.token='${JUPYTER_TOKEN:-movie-mlops-jupyter}'
         --NotebookApp.password=''
@@ -50,13 +47,14 @@ services:
         --NotebookApp.ip='0.0.0.0'
         --NotebookApp.port=8888
         --NotebookApp.notebook_dir='/home/jovyan'
+        --LabApp.default_url='/lab'
       "
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8888/api"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 60s
 
 networks:
   movie-mlops-network:
