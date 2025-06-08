@@ -53,11 +53,11 @@ RUN adduser --disabled-password --gecos '' feastuser && \
 USER feastuser
 
 # 포트 노출
-EXPOSE 6566
+EXPOSE 6567
 
 # 헬스체크
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:6566/health || exit 1
+    CMD curl -f http://localhost:6567/health || exit 1
 
 # 컨테이너 시작 시 실행할 명령
-CMD ["feast", "serve", "--host", "0.0.0.0", "--port", "6566"]
+CMD ["feast", "serve", "--host", "0.0.0.0", "--port", "6567"]

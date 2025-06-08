@@ -1,12 +1,12 @@
 # ==============================================================================
 # Apache Airflow Dockerfile - 1아키텍처 + 5아키텍처
-# Python 3.11 + Airflow 2.10.5 + 호환성 보장
+# Python 3.11 + Airflow 2.9.3 + 호환성 보장
 # ==============================================================================
 
 FROM python:3.11-slim
 
 # 빌드 인수
-ARG AIRFLOW_VERSION=2.10.5
+ARG AIRFLOW_VERSION=2.9.3
 ARG PYTHON_VERSION=3.11
 
 # 환경 변수 설정
@@ -32,24 +32,22 @@ RUN groupadd --gid 50000 airflow \
 # pip 업그레이드
 RUN pip install --upgrade pip
 
-# Airflow constraints 파일 다운로드 및 적용
-RUN CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt" \
-    && pip install "apache-airflow==${AIRFLOW_VERSION}" --constraint "${CONSTRAINT_URL}"
+# Airflow 설치 (안정적인 방식)
+RUN pip install "apache-airflow[postgres,celery]==${AIRFLOW_VERSION}"
 
 # Requirements 복사 및 설치
 COPY requirements/ /app/requirements/
-RUN CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt" \
-    && pip install -r /app/requirements/airflow.txt --constraint "${CONSTRAINT_URL}"
+RUN pip install -r /app/requirements/airflow.txt
 
 # 애플리케이션 코드 복사
 COPY . /app/
 
+# Airflow 디렉토리 생성 (권한 설정 전에 먼저 생성)
+RUN mkdir -p ${AIRFLOW_HOME}/dags ${AIRFLOW_HOME}/logs ${AIRFLOW_HOME}/plugins
+
 # 권한 설정
 RUN chown -R airflow:airflow /opt/airflow /app
 USER airflow
-
-# Airflow 디렉터리 생성
-RUN mkdir -p ${AIRFLOW_HOME}/dags ${AIRFLOW_HOME}/logs ${AIRFLOW_HOME}/plugins
 
 # 포트 노출
 EXPOSE 8080 8793
