@@ -385,7 +385,7 @@ show_service_urls() {
     echo ""
     echo "🔹 ML 도구:"
     echo "   MLflow UI: http://localhost:5000"
-    echo "   Feast UI: http://localhost:6567"
+    echo "   Feast UI: http://localhost:6567/docs"
     echo ""
     echo "🔹 워크플로우:"
     echo "   Airflow UI: http://localhost:8080 (admin/admin)"
