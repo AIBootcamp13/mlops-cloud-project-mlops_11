@@ -1,6 +1,6 @@
 """
 Movie MLOps FastAPI Main Application
-기존 my-mlops 로직을 FastAPI로 래핑
+기존 my-mlops 로직을 FastAPI로 래핑 - API 경로 표준화
 """
 
 from fastapi import FastAPI, HTTPException, Query
@@ -21,7 +21,7 @@ sys.path.append('/app/src')
 try:
     from src.models.legacy.movie_predictor import MoviePredictor
     from src.dataset.data_loader import SimpleDataLoader
-    from src.dataset.watch_log import get_datasets
+    from src.dataset.watch_log_fixed import get_datasets
     from src.utils.utils import init_seed
 except ImportError as e:
     logging.warning(f"일부 모듈 import 실패: {e}")
@@ -52,8 +52,8 @@ logger = logging.getLogger(__name__)
 # FastAPI 앱 초기화
 app = FastAPI(
     title="Movie MLOps API",
-    description="영화 추천 MLOps 시스템 - 기존 my-mlops 로직 통합",
-    version="1.0.0",
+    description="영화 추천 MLOps 시스템 - RESTful API 표준 준수",
+    version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -67,20 +67,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 라우터 등록
+# 라우터 등록 (v1 API 표준화)
 if recommendations_router:
-    app.include_router(recommendations_router)
+    app.include_router(recommendations_router, prefix="/api/v1")
 if features_router:
-    app.include_router(features_router)
+    app.include_router(features_router, prefix="/api/v1")
 if mlflow_router:
-    app.include_router(mlflow_router)
+    app.include_router(mlflow_router, prefix="/api/v1")
 
-# 메트릭 라우터 추가
+# 추가 라우터들
 try:
     from src.api.routers.metrics import router as metrics_router
-    app.include_router(metrics_router)
+    app.include_router(metrics_router, prefix="/api/v1")
 except ImportError:
     logging.warning("metrics 라우터 import 실패")
+
+try:
+    from src.api.routers.feedback import router as feedback_router
+    app.include_router(feedback_router)  # 이미 /api/v1 prefix 포함
+except ImportError:
+    logging.warning("feedback 라우터 import 실패")
+
+try:
+    from src.api.routers.events import router as events_router
+    app.include_router(events_router)  # 이미 /api/v1 prefix 포함
+except ImportError:
+    logging.warning("events 라우터 import 실패")
 
 # 전역 변수 (모델 및 데이터셋)
 model = None
@@ -114,7 +126,6 @@ async def load_model():
         logger.info(f"모델 초기화 완료 - input_dim: {model_params['input_dim']}, num_classes: {model_params['num_classes']}")
         
         # 간단한 훈련 (실제로는 사전 훈련된 모델을 로드해야 함)
-        # 여기서는 빠른 테스트를 위해 몇 번만 훈련
         from src.training.train import train
         train_loader = SimpleDataLoader(train_dataset.features, train_dataset.labels, batch_size=32, shuffle=True)
         
@@ -129,13 +140,30 @@ async def load_model():
         logger.error(f"모델 로딩 실패: {e}")
         model_loaded = False
 
+# ==========================================
+# 기본 시스템 엔드포인트들 (표준화)
+# ==========================================
+
 @app.get("/")
 async def root():
-    """루트 엔드포인트"""
+    """루트 엔드포인트 - API 정보 제공"""
     return {
-        "message": "Movie MLOps API",
+        "service": "Movie MLOps API",
+        "version": "2.0.0", 
         "status": "running",
         "model_loaded": model_loaded,
+        "api_docs": "/docs",
+        "api_redoc": "/redoc",
+        "endpoints": {
+            "recommendations": "/api/v1/recommendations",
+            "features": "/api/v1/features",
+            "feedback": "/api/v1/feedback", 
+            "events": "/api/v1/events",
+            "mlflow": "/api/v1/mlflow",
+            "health": "/health",
+            "movies": "/api/v1/movies",
+            "model_info": "/api/v1/model/info"
+        },
         "timestamp": datetime.now().isoformat()
     }
 
@@ -145,15 +173,24 @@ async def health_check():
     return {
         "status": "healthy" if model_loaded else "loading",
         "service": "movie-mlops-api",
+        "version": "2.0.0",
         "model_loaded": model_loaded,
         "environment": os.getenv("ENVIRONMENT", "development"),
+        "uptime": "running",
         "timestamp": datetime.now().isoformat()
     }
 
-@app.get("/")
-async def get_recommendations(k: int = Query(10, description="추천할 영화 수")):
+# ==========================================
+# v1 API 엔드포인트들 (RESTful 표준)
+# ==========================================
+
+@app.get("/api/v1/recommendations")
+async def get_recommendations(
+    k: int = Query(10, description="추천할 영화 수", ge=1, le=100),
+    user_id: Optional[str] = Query(None, description="사용자 ID")
+):
     """
-    영화 추천 엔드포인트 (기존 my-mlops-web API와 호환)
+    영화 추천 API - RESTful 표준
     """
     if not model_loaded or not model or not train_dataset:
         raise HTTPException(
@@ -162,10 +199,7 @@ async def get_recommendations(k: int = Query(10, description="추천할 영화 �
         )
     
     try:
-        # 기존 로직을 사용한 추천
-        # 실제로는 사용자별 추천을 해야 하지만, 여기서는 샘플 예측을 반환
-        
-        # 테스트 데이터의 첫 번째 배치를 사용해서 예측
+        # 테스트 데이터를 사용한 추천
         test_loader = SimpleDataLoader(test_dataset.features[:k], test_dataset.labels[:k], batch_size=k, shuffle=False)
         
         from src.evaluation.evaluate import evaluate
@@ -174,11 +208,13 @@ async def get_recommendations(k: int = Query(10, description="추천할 영화 �
         # content_id로 디코딩
         recommended_content_ids = [train_dataset.decode_content_id(idx) for idx in predictions[:k]]
         
-        logger.info(f"추천 완료: {len(recommended_content_ids)}개 영화")
+        logger.info(f"추천 완료: {len(recommended_content_ids)}개 영화 (사용자: {user_id})")
         
         return {
-            "recommended_content_id": recommended_content_ids,
-            "k": k,
+            "user_id": user_id,
+            "recommendations": recommended_content_ids,
+            "count": len(recommended_content_ids),
+            "algorithm": "neural_network_v1",
             "timestamp": datetime.now().isoformat()
         }
         
@@ -187,95 +223,136 @@ async def get_recommendations(k: int = Query(10, description="추천할 영화 �
         # 실패 시 더미 데이터 반환 (기존 동작 유지)
         dummy_ids = list(range(1, k+1))
         return {
-            "recommended_content_id": dummy_ids,
-            "k": k,
-            "fallback": True,
+            "user_id": user_id,
+            "recommendations": dummy_ids,
+            "count": len(dummy_ids),
+            "algorithm": "fallback",
             "error": str(e),
             "timestamp": datetime.now().isoformat()
         }
 
-@app.get("/movies")
-async def get_movies():
-    """영화 목록 반환"""
+@app.get("/api/v1/movies")
+async def get_movies(
+    limit: int = Query(10, description="반환할 영화 수", ge=1, le=100),
+    offset: int = Query(0, description="시작 오프셋", ge=0)
+):
+    """영화 목록 API - RESTful 표준"""
     try:
-        # 실제 데이터가 있다면 사용
         if train_dataset:
-            # 일부 영화 ID들을 샘플로 반환
+            # 페이지네이션 적용
+            total_movies = train_dataset.num_classes
+            start_idx = offset
+            end_idx = min(offset + limit, total_movies)
+            
             sample_movies = []
-            for i in range(min(10, train_dataset.num_classes)):
+            for i in range(start_idx, end_idx):
                 content_id = train_dataset.decode_content_id(i)
                 sample_movies.append({
                     "id": content_id,
                     "title": f"Movie {content_id}",
-                    "rating": 8.0 + (i % 3) * 0.3  # 가상 평점
+                    "rating": round(8.0 + (i % 3) * 0.3, 1),
+                    "genre": ["Action", "Drama", "Comedy"][i % 3]
                 })
             
             return {
                 "movies": sample_movies,
-                "count": len(sample_movies),
-                "total_movies": train_dataset.num_classes
+                "pagination": {
+                    "limit": limit,
+                    "offset": offset,
+                    "count": len(sample_movies),
+                    "total": total_movies,
+                    "has_next": end_idx < total_movies
+                },
+                "timestamp": datetime.now().isoformat()
             }
         else:
             # 기본 더미 데이터
             return {
                 "movies": [
-                    {"id": 1, "title": "Inception", "rating": 8.8},
-                    {"id": 2, "title": "The Matrix", "rating": 8.7},
-                    {"id": 3, "title": "Interstellar", "rating": 8.6}
-                ],
-                "count": 3
+                    {"id": 1, "title": "Inception", "rating": 8.8, "genre": "Sci-Fi"},
+                    {"id": 2, "title": "The Matrix", "rating": 8.7, "genre": "Action"},
+                    {"id": 3, "title": "Interstellar", "rating": 8.6, "genre": "Drama"}
+                ][:limit],
+                "pagination": {
+                    "limit": limit,
+                    "offset": offset,
+                    "count": min(3, limit),
+                    "total": 3,
+                    "has_next": False
+                }
             }
     except Exception as e:
         logger.error(f"영화 목록 조회 실패: {e}")
         raise HTTPException(status_code=500, detail=f"영화 목록 조회 실패: {str(e)}")
 
-@app.get("/model/info")
+@app.get("/api/v1/model/info")
 async def get_model_info():
-    """모델 정보 반환"""
+    """모델 정보 API - RESTful 표준"""
     if not model_loaded or not model:
         raise HTTPException(status_code=503, detail="모델이 로딩되지 않았습니다.")
     
     try:
         return {
-            "model_name": model.name,
-            "model_type": "NumPy-based Neural Network",
-            "input_dim": train_dataset.features_dim if train_dataset else "unknown",
-            "num_classes": train_dataset.num_classes if train_dataset else "unknown",
-            "hidden_dim": 64,
-            "framework": "NumPy",
-            "status": "loaded",
+            "model": {
+                "name": model.name,
+                "type": "Neural Network",
+                "framework": "NumPy",
+                "version": "1.0.0",
+                "status": "loaded"
+            },
+            "architecture": {
+                "input_dim": train_dataset.features_dim if train_dataset else "unknown",
+                "hidden_dim": 64,
+                "output_dim": train_dataset.num_classes if train_dataset else "unknown"
+            },
+            "dataset": {
+                "train_size": len(train_dataset.features) if train_dataset else 0,
+                "val_size": len(val_dataset.features) if val_dataset else 0,
+                "test_size": len(test_dataset.features) if test_dataset else 0
+            },
+            "performance": {
+                "last_training_loss": "available_after_training",
+                "accuracy": "available_after_evaluation"
+            },
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
         logger.error(f"모델 정보 조회 실패: {e}")
         raise HTTPException(status_code=500, detail=f"모델 정보 조회 실패: {str(e)}")
 
-@app.get("/dataset/info")
-async def get_dataset_info():
-    """데이터셋 정보 반환"""
-    if not train_dataset:
-        raise HTTPException(status_code=503, detail="데이터셋이 로딩되지 않았습니다.")
-    
-    try:
-        return {
-            "train_size": len(train_dataset.features),
-            "val_size": len(val_dataset.features) if val_dataset else 0,
-            "test_size": len(test_dataset.features) if test_dataset else 0,
-            "features_dim": train_dataset.features_dim,
-            "num_classes": train_dataset.num_classes,
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        logger.error(f"데이터셋 정보 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail=f"데이터셋 정보 조회 실패: {str(e)}")
+# ==========================================
+# 하위 호환성 유지 (기존 React 앱 지원)
+# ==========================================
 
+@app.get("/recommendations")
+async def get_recommendations_legacy(k: int = Query(10, description="추천할 영화 수")):
+    """기존 React 앱과의 하위 호환성을 위한 레거시 엔드포인트"""
+    logger.warning("레거시 API 호출됨. /api/v1/recommendations 사용을 권장합니다.")
+    
+    # 새로운 API로 리다이렉트
+    result = await get_recommendations(k=k)
+    
+    # 기존 형식으로 변환
+    return {
+        "recommended_content_id": result.get("recommendations", []),
+        "k": k,
+        "timestamp": result.get("timestamp")
+    }
+
+# ==========================================
 # 에러 핸들러
+# ==========================================
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     logger.error(f"예상치 못한 에러: {exc}")
     return JSONResponse(
         status_code=500,
-        content={"detail": f"내부 서버 에러: {str(exc)}"}
+        content={
+            "error": "Internal Server Error",
+            "detail": f"서버에서 예상치 못한 오류가 발생했습니다: {str(exc)}",
+            "timestamp": datetime.now().isoformat()
+        }
     )
 
 if __name__ == "__main__":
