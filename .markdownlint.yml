@@ -1,0 +1,41 @@
+# ==============================================================================
+# markdownlint 설정
+# 마크다운 문서 품질 검사를 위한 설정
+# ==============================================================================
+
+# 기본 규칙 사용
+default: true
+
+# 특정 규칙 비활성화
+MD013:
+  # 줄 길이 제한 완화 (한국어 고려)
+  line_length: 100
+  
+MD033:
+  # HTML 태그 허용 (마크다운에서 HTML 필요한 경우)
+  allowed_elements: [
+    'br', 'pre', 'code', 'kbd', 'sub', 'sup',
+    'details', 'summary', 'div', 'span',
+    'antml:cite', 'antml:function_calls'
+  ]
+
+MD041:
+  # 첫 번째 줄 헤더 요구사항 완화
+  front_matter_title: "^\\s*title\\s*[:=]"
+
+# 인라인 HTML 허용
+MD033: false
+
+# 중복 헤더 허용 (문서 구조상 필요)
+MD024: false
+
+# 빈 줄 규칙 완화
+MD012: false
+
+# 들여쓰기 규칙 (2칸 사용)
+MD007:
+  indent: 2
+
+# 코드 블록 스타일
+MD046:
+  style: "fenced"

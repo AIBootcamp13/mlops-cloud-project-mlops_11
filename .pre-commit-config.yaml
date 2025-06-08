@@ -1,0 +1,191 @@
+# ==============================================================================
+# WSL Docker 환경용 Pre-commit Configuration
+# Movie MLOps 프로젝트 코드 품질 자동 검사
+# ==============================================================================
+
+repos:
+  # 기본 파일 검사
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^(data/|logs/|models/|docker/volumes/)
+      - id: end-of-file-fixer
+        exclude: ^(data/|logs/|models/|docker/volumes/|\.env$)
+      - id: check-yaml
+        exclude: ^(docker/|k8s/).*\.ya?ml$  # Docker/K8s 템플릿 제외
+      - id: check-added-large-files
+        args: ['--maxkb=10240']  # 10MB 제한
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-json
+        exclude: ^(\.vscode/|docker/configs/)
+      - id: debug-statements
+      - id: mixed-line-ending
+        args: ['--fix=lf']  # WSL 환경에서 LF 강제
+
+  # Docker 파일 검사
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        files: ^docker/dockerfiles/Dockerfile.*
+
+  # 환경 변수 파일 검사 (보안)
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: ^(\.env\.template|tests/fixtures/)
+
+  # Python 코드 포매팅
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        language_version: python3.11
+        exclude: ^(migrations/|docker/|scripts/legacy/)
+
+  # Import 정렬
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: isort (python)
+        args: ["--profile", "black", "--line-length", "88"]
+        exclude: ^(migrations/|docker/)
+
+  # Linting
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.1.0
+    hooks:
+      - id: flake8
+        additional_dependencies: 
+          - flake8-docstrings
+          - flake8-import-order
+          - flake8-bugbear
+          - flake8-comprehensions
+        args: 
+          - --max-line-length=88
+          - --extend-ignore=E203,W503,E501
+          - --exclude=migrations,docker,logs,data
+        exclude: ^(migrations/|docker/|tests/fixtures/)
+
+  # 타입 체크 (Docker 환경에서는 완화)
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        additional_dependencies: 
+          - types-requests
+          - types-PyYAML
+          - types-redis
+          - types-psycopg2
+        args: [--config-file=mypy.ini, --no-error-summary]
+        exclude: ^(tests/|scripts/|migrations/|docker/)
+
+  # 보안 검사
+  - repo: https://github.com/pycqa/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        args: ["-c", "pyproject.toml", "-ll"]
+        additional_dependencies: ["bandit[toml]"]
+        exclude: ^(tests/|scripts/setup/|docker/)
+
+  # YAML Linting
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.33.0
+    hooks:
+      - id: yamllint
+        args: [-c=.yamllint.yml]
+        exclude: ^(docker/|k8s/|\.github/)
+
+  # Shell Script 검사
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        files: \.(sh|bash)$
+        exclude: ^(scripts/legacy/|docker/configs/)
+
+  # WSL Docker 특화 검사들
+  - repo: local
+    hooks:
+      # 기본 테스트 실행
+      - id: pytest-unit
+        name: Unit Tests
+        entry: python -m pytest tests/unit/ -v --tb=short -x
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      # 패키지 호환성 검사
+      - id: compatibility-check
+        name: Package Compatibility Check
+        entry: pip check
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      # .env 템플릿 검증
+      - id: env-template-check
+        name: Environment Template Check
+        entry: bash -c 'if [ -f .env.template ]; then echo "✅ .env.template exists"; else echo "❌ .env.template missing" && exit 1; fi'
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      # Docker Compose 검증
+      - id: docker-compose-validate
+        name: Docker Compose Validation
+        entry: bash -c 'for file in docker/docker-compose.*.yml; do echo "Checking $file..."; docker-compose -f "$file" config >/dev/null || exit 1; done'
+        language: system
+        pass_filenames: false
+        files: ^docker/docker-compose.*\.yml$
+
+      # Requirements 동기화 검사
+      - id: requirements-sync
+        name: Requirements Sync Check
+        entry: python -c "
+import os
+req_files = [f for f in os.listdir('requirements/') if f.endswith('.txt')]
+if len(req_files) < 5:
+    print('❌ Not enough requirements files')
+    exit(1)
+print(f'✅ Found {len(req_files)} requirements files')
+"
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      # WSL 경로 체크
+      - id: wsl-path-check
+        name: WSL Path Check
+        entry: bash -c 'if grep -q "C:\\\\dev\\\\movie-mlops" docker/docker-compose.*.yml; then echo "❌ Windows paths found in Docker configs" && exit 1; else echo "✅ WSL paths OK"; fi'
+        language: system
+        pass_filenames: false
+        files: ^docker/.*\.yml$
+
+# ==============================================================================
+# Pre-commit 설정
+# ==============================================================================
+default_stages: [commit]
+fail_fast: false
+minimum_pre_commit_version: '3.0.0'
+
+# ==============================================================================
+# CI 환경에서의 Pre-commit
+# ==============================================================================
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit.com hooks
+    
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: [pytest-unit, compatibility-check, docker-compose-validate]
+  submodules: false

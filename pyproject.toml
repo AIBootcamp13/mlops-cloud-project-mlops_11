@@ -1,0 +1,332 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "movie-mlops"
+version = "1.0.0"
+description = "WSL Docker 기반 영화 추천 MLOps 시스템"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "Movie MLOps Team", email = "team@moviemlops.com"}
+]
+keywords = ["mlops", "machine-learning", "movie-recommendation", "docker", "wsl", "airflow", "pytorch"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Environment :: Other Environment",
+]
+
+# WSL Docker 환경에서는 기본 의존성을 최소화하고 requirements/ 폴더 활용
+dependencies = [
+    # 기본 유틸리티만 포함 (Docker에서 개별 서비스별로 설치)
+    "python-dotenv>=1.0.0,<1.1.0",  # .env 파일 로드
+    "structlog>=23.2.0,<23.3.0",    # 로깅
+    "requests>=2.31.0,<2.32.0",     # HTTP 클라이언트
+]
+
+# 선택적 의존성 - Docker 서비스별로 매핑
+[project.optional-dependencies]
+# 개발 환경 (Jupyter + 기본 도구)
+dev = [
+    "pytest>=7.4.0,<7.5.0",
+    "pytest-asyncio>=0.21.0,<0.22.0",
+    "pytest-cov>=4.1.0,<4.2.0",
+    "black>=23.12.0,<23.13.0",
+    "isort>=5.13.0,<5.14.0",
+    "flake8>=6.1.0,<6.2.0",
+    "mypy>=1.8.0,<1.9.0",
+    "pre-commit>=3.6.0,<3.7.0",
+]
+
+# Jupyter 환경
+jupyter = [
+    "jupyter>=1.0.0,<1.1.0",
+    "jupyterlab>=4.0.0,<4.1.0",
+    "matplotlib>=3.8.0,<3.9.0",
+    "seaborn>=0.13.0,<0.14.0",
+    "plotly>=5.17.0,<5.18.0",
+    "pandas>=2.1.0,<2.2.0",
+    "numpy>=1.24.0,<1.25.0",
+]
+
+# FastAPI 서비스
+api = [
+    "fastapi>=0.104.0,<0.105.0",
+    "uvicorn[standard]>=0.24.0,<0.25.0",
+    "pydantic>=2.5.0,<2.6.0",
+    "pydantic-settings>=2.1.0,<2.2.0",
+]
+
+# MLflow 서비스
+mlflow = [
+    "mlflow>=2.17.0,<2.18.0",
+    "boto3>=1.34.0,<1.35.0",  # S3 호환 스토리지
+]
+
+# Airflow 서비스
+airflow = [
+    "apache-airflow>=2.10.0,<2.11.0",
+    "apache-airflow-providers-postgres>=5.13.0,<5.14.0",
+    "apache-airflow-providers-celery>=3.8.0,<3.9.0",
+    "apache-airflow-providers-redis>=3.8.0,<3.9.0",
+]
+
+# Feast 피처 스토어
+feast = [
+    "feast[redis,postgres]>=0.40.0,<0.41.0",
+    "feast[aws]>=0.40.0,<0.41.0",
+]
+
+# PyTorch 추론
+pytorch = [
+    "torch>=2.5.0,<2.6.0",
+    "torchvision>=0.20.0,<0.21.0",
+    "torchaudio>=2.5.0,<2.6.0",
+    "scikit-learn>=1.3.0,<1.4.0",
+]
+
+# Kafka 이벤트 스트리밍
+kafka = [
+    "kafka-python>=2.0.2,<2.1.0",
+    "confluent-kafka>=2.3.0,<2.4.0",
+    "avro-python3>=1.11.0,<1.12.0",
+]
+
+# 모니터링
+monitoring = [
+    "prometheus-client>=0.21.0,<0.22.0",
+    "grafana-client>=4.2.0,<4.3.0",
+    "psutil>=5.9.0,<5.10.0",
+]
+
+# 데이터베이스 클라이언트
+postgres = [
+    "psycopg2-binary>=2.9.0,<2.10.0",
+    "sqlalchemy>=2.0.0,<2.1.0",
+    "alembic>=1.13.0,<1.14.0",
+]
+
+redis = [
+    "redis>=5.0.0,<5.1.0",
+    "aioredis>=2.0.1,<2.1.0",
+]
+
+# 프로덕션 환경
+prod = [
+    "gunicorn>=21.2.0,<21.3.0",
+    "cryptography>=41.0.0,<41.1.0",
+    "orjson>=3.9.0,<3.10.0",
+]
+
+# 클라우드 제공자별
+cloud-aws = [
+    "boto3>=1.34.0,<1.35.0",
+    "botocore>=1.34.0,<1.35.0",
+]
+
+cloud-gcp = [
+    "google-cloud-storage>=2.10.0,<2.11.0",
+    "google-auth>=2.23.0,<2.24.0",
+]
+
+cloud-azure = [
+    "azure-storage-blob>=12.19.0,<12.20.0",
+    "azure-identity>=1.15.0,<1.16.0",
+]
+
+# WSL Docker 환경에서 모든 의존성 (개발용)
+all = [
+    "movie-mlops[dev,jupyter,api,mlflow,airflow,feast,pytorch,kafka,monitoring,postgres,redis]",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourorg/movie-mlops"
+Repository = "https://github.com/yourorg/movie-mlops.git"
+Documentation = "https://movie-mlops.readthedocs.io"
+"Bug Tracker" = "https://github.com/yourorg/movie-mlops/issues"
+
+# WSL Docker 환경용 스크립트 명령어
+[project.scripts]
+movie-mlops = "src.cli.main:main"
+mlops-docker = "scripts.docker.main:main"
+mlops-wsl = "scripts.wsl.main:main"
+
+# =============================================================================
+# WSL Docker 환경 도구 설정
+# =============================================================================
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+exclude = ["tests*", "docs*", "docker*", "scripts*"]
+
+[tool.setuptools.package-data]
+"*" = [
+    "*.yml", "*.yaml", "*.json", "*.toml", "*.cfg", "*.ini", 
+    "*.env", "*.env.template", "*.dockerignore", "Dockerfile*"
+]
+
+# Black 코드 포매터 설정 (WSL 경로 고려)
+[tool.black]
+line-length = 88
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | node_modules
+  | docker
+  | logs
+  | data
+)/
+'''
+
+# isort import 정렬 설정
+[tool.isort]
+profile = "black"
+line_length = 88
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+known_first_party = ["src"]
+known_third_party = [
+    "airflow",
+    "feast",
+    "mlflow", 
+    "torch",
+    "prometheus_client",
+    "kafka",
+    "fastapi",
+    "pandas",
+    "numpy",
+    "sklearn",
+    "pydantic",
+    "redis",
+    "psycopg2",
+    "docker",
+]
+
+# MyPy 타입 체커 설정 (Docker 환경 고려)
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false  # Docker 환경에서는 완화
+disallow_incomplete_defs = false
+check_untyped_defs = true
+disallow_untyped_decorators = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "airflow.*",
+    "feast.*",
+    "mlflow.*",
+    "kafka.*",
+    "prometheus_client.*",
+    "docker.*",
+    "uvicorn.*",
+]
+ignore_missing_imports = true
+
+# Pytest 테스트 설정 (Docker/WSL 환경)
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --strict-markers --strict-config"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "docker: marks tests related to Docker",
+    "wsl: marks tests related to WSL",
+    "airflow: marks tests related to Airflow",
+    "pytorch: marks tests related to PyTorch",
+    "feast: marks tests related to Feast",
+    "mlflow: marks tests related to MLflow",
+    "api: marks tests related to FastAPI",
+    "env: marks tests related to environment variables",
+]
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+env = [
+    "ENVIRONMENT=test",
+    "DEBUG=false",
+]
+
+# Coverage 설정 (Docker 볼륨 경로 제외)
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+    "*/venv/*",
+    "*/.venv/*",
+    "*/docker/*",
+    "*/logs/*",
+    "*/data/*",
+    "*/models/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+show_missing = true
+precision = 2
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+# WSL Docker 환경 특화 설정
+[tool.docker]
+# Docker 빌드 최적화
+build_parallel = true
+build_cache = true
+wsl_integration = true
+
+[tool.wsl]
+# WSL 경로 매핑
+host_path = "/mnt/c/dev/movie-mlops"
+container_path = "/app"

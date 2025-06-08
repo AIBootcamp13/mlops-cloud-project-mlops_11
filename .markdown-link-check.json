@@ -1,0 +1,42 @@
+{
+  "ignorePatterns": [
+    {
+      "pattern": "^https://localhost.*"
+    },
+    {
+      "pattern": "^http://localhost.*"
+    },
+    {
+      "pattern": "^https://.*\\.local.*"
+    }
+  ],
+  "timeout": "30s",
+  "retryOn429": true,
+  "retryCount": 3,
+  "fallbackHttpStatus": [
+    400,
+    401, 
+    403,
+    404,
+    500,
+    502,
+    503
+  ],
+  "aliveStatusCodes": [
+    200,
+    206,
+    300,
+    301,
+    302,
+    304
+  ],
+  "httpHeaders": [
+    {
+      "urls": ["https://github.com", "https://api.github.com"],
+      "headers": {
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "markdown-link-check"
+      }
+    }
+  ]
+}

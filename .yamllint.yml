@@ -1,0 +1,52 @@
+# ==============================================================================
+# yamllint configuration for WSL Docker Movie MLOps
+# ==============================================================================
+
+extends: default
+
+rules:
+  # 라인 길이 설정 (Docker Compose에서 긴 명령어 허용)
+  line-length:
+    max: 120
+    level: warning
+
+  # 들여쓰기 설정
+  indentation:
+    spaces: 2
+    indent-sequences: true
+
+  # 주석 설정
+  comments:
+    min-spaces-from-content: 1
+
+  # 문서 시작 설정 (Docker Compose에서는 --- 불필요)
+  document-start:
+    present: false
+
+  # 빈 라인 설정
+  empty-lines:
+    max: 2
+    max-start: 1
+    max-end: 1
+
+  # 키 중복 허용 안함
+  key-duplicates: enable
+
+  # 키 순서 (Docker Compose에서는 완화)
+  key-ordering: disable
+
+  # 큰따옴표 허용
+  quoted-strings:
+    quote-type: any
+    required: false
+
+  # truthy values (Docker Compose boolean 값들)
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no', 'on', 'off']
+    check-keys: false
+
+# 파일별 예외 설정
+ignore: |
+  docker/configs/
+  .github/workflows/
+  k8s/
