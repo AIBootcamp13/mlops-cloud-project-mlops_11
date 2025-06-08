@@ -19,6 +19,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     git \
     libpq-dev \
+    jq \
     && rm -rf /var/lib/apt/lists/*
 
 # 작업 디렉터리 설정
@@ -28,8 +29,8 @@ WORKDIR /app
 RUN pip install --upgrade pip
 
 # Requirements 복사 및 설치
-COPY requirements/mlflow.txt /tmp/requirements-mlflow.txt
-RUN pip install -r /tmp/requirements-mlflow.txt
+COPY requirements/ /app/requirements/
+RUN pip install -r /app/requirements/mlflow.txt
 
 # 애플리케이션 코드 복사
 COPY . /app/

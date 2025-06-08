@@ -41,7 +41,9 @@ RUN mkdir -p /app/feast_repo /app/data /app/logs
 
 # 소스 코드 복사
 COPY src/ /app/src/
-COPY config/ /app/config/
+
+# 설정 파일 복사 (필요시)
+# COPY config/ /app/config/
 
 # 비root 사용자 생성
 RUN adduser --disabled-password --gecos '' feastuser && \

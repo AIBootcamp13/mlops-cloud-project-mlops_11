@@ -64,7 +64,7 @@ services:
   # MLflow - 실험 추적 및 모델 레지스트리
   mlflow:
     build:
-      context: ${HOST_PROJECT_PATH:-.}
+      context: ${HOST_PROJECT_PATH:-../../}
       dockerfile: docker/dockerfiles/Dockerfile.mlflow
       args:
         - MLFLOW_VERSION=${MLFLOW_VERSION:-2.17.2}
@@ -95,7 +95,7 @@ services:
   # Feast - 피처 스토어
   feast:
     build:
-      context: ${HOST_PROJECT_PATH:-.}
+      context: ${HOST_PROJECT_PATH:-../../}
       dockerfile: docker/dockerfiles/Dockerfile.feast
       args:
         - FEAST_VERSION=${FEAST_VERSION:-0.40.1}
@@ -126,7 +126,7 @@ services:
   # PyTorch - 딥러닝 모델 훈련 서비스
   pytorch-trainer:
     build:
-      context: ${HOST_PROJECT_PATH:-.}
+      context: ${HOST_PROJECT_PATH:-../../}
       dockerfile: docker/dockerfiles/Dockerfile.pytorch
       args:
         - PYTORCH_VERSION=${PYTORCH_VERSION:-2.5.1}
@@ -167,7 +167,7 @@ services:
   # FastAPI - 메인 추천 API
   api:
     build:
-      context: ${HOST_PROJECT_PATH:-.}
+      context: ${HOST_PROJECT_PATH:-../../}
       dockerfile: docker/dockerfiles/Dockerfile.api
     container_name: movie-mlops-api
     ports:
@@ -206,7 +206,7 @@ services:
   # Airflow Webserver - 데이터 파이프라인 관리
   airflow-webserver:
     build:
-      context: ${HOST_PROJECT_PATH:-.}
+      context: ${HOST_PROJECT_PATH:-../../}
       dockerfile: docker/dockerfiles/Dockerfile.airflow
       args:
         - AIRFLOW_VERSION=${AIRFLOW_VERSION:-2.10.5}
@@ -283,7 +283,7 @@ services:
   # Jupyter Lab - 개발 및 실험 환경
   jupyter:
     build:
-      context: ${HOST_PROJECT_PATH:-.}
+      context: ${HOST_PROJECT_PATH:-../../}
       dockerfile: docker/dockerfiles/Dockerfile.jupyter
     container_name: movie-mlops-jupyter
     ports:

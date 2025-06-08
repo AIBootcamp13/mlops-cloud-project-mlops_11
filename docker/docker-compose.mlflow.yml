@@ -43,8 +43,8 @@ services:
   # =============================================================================
   mlflow:
     build:
-      context: ${HOST_PROJECT_PATH:-.}
-      dockerfile: docker/dockerfiles/Dockerfile.mlflow
+      context: ..
+      dockerfile: dockerfiles/Dockerfile.mlflow
     container_name: mlflow-server
     environment:
       - MLFLOW_BACKEND_STORE_URI=postgresql://mlflow:mlflow@postgres:5432/mlflow

@@ -38,7 +38,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY src/ /app/src/
 COPY data/ /app/data/
 COPY models/ /app/models/
-COPY config/ /app/config/
+# COPY config/ /app/config/
 
 # 필요한 디렉토리 생성
 RUN mkdir -p /app/data/raw/tmdb /app/data/processed /app/models/trained /app/logs

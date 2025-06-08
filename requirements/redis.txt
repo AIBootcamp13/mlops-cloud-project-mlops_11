@@ -3,14 +3,15 @@
 # ==============================================================================
 
 # Redis 클라이언트
-redis==5.0.1
-redis-py-cluster==2.1.3
+redis==5.0.3
+# redis-py-cluster는 더 이상 필요하지 않음 (redis 5.0+에서 클러스터 지원)
 
 # 비동기 Redis
 aioredis==2.0.1
 
 # Redis 모니터링
-redis-metrics==1.1.0
+# redis-metrics는 사용할 수 없으므로 제거
+# 대신 prometheus-client를 통한 모니터링 사용
 
 # 캐시 관련
-python-memcached==1.62
+# python-memcached==1.62 - 필요시에만 추가

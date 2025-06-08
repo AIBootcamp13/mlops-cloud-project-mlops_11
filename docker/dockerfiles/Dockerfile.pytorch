@@ -27,8 +27,8 @@ WORKDIR /app
 RUN pip install --upgrade pip
 
 # Requirements 복사 및 설치
-COPY requirements/pytorch.txt /tmp/requirements-pytorch.txt
-RUN pip install -r /tmp/requirements-pytorch.txt --index-url https://download.pytorch.org/whl/cpu
+COPY requirements/ /app/requirements/
+RUN pip install -r /app/requirements/pytorch.txt --index-url https://download.pytorch.org/whl/cpu
 
 # 애플리케이션 코드 복사
 COPY . /app/
