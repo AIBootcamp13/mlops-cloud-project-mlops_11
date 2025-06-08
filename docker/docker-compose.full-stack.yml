@@ -1,0 +1,133 @@
+# ==============================================================================
+# Docker Compose - 전체 스택 (인프라 + API)
+# 단일 파일로 모든 서비스 통합 관리
+# ==============================================================================
+
+services:
+  # PostgreSQL 데이터베이스
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:15-alpine}
+    container_name: movie-mlops-postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres123}
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale=C
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/configs/postgres/init:/docker-entrypoint-initdb.d
+      - ./logs/postgres:/var/log/postgresql
+    networks:
+      - movie-mlops-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Redis 캐시
+  redis:
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    container_name: movie-mlops-redis
+    restart: unless-stopped
+    command: >
+      redis-server 
+      --appendonly yes 
+      --appendfsync everysec
+      --maxmemory ${REDIS_MEMORY_LIMIT:-512m}
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+      - ./logs/redis:/var/log/redis
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    networks:
+      - movie-mlops-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # FastAPI 서비스
+  api:
+    build:
+      context: ..
+      dockerfile: ./docker/dockerfiles/Dockerfile.api
+      args:
+        - PYTHON_VERSION=3.11
+    image: ${API_IMAGE_NAME:-movie-mlops/api}:${API_VERSION:-latest}
+    container_name: movie-mlops-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      # FastAPI 설정
+      - API_HOST=${API_HOST:-0.0.0.0}
+      - API_PORT=8000
+      - API_WORKERS=${API_WORKERS:-4}
+      - API_RELOAD=${API_RELOAD:-true}
+      - API_LOG_LEVEL=${API_LOG_LEVEL:-info}
+      
+      # 환경 설정
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - DEBUG=${DEBUG:-true}
+      - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-change-this-in-production-please}
+      - ALGORITHM=${ALGORITHM:-HS256}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      
+      # 데이터베이스 연결
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres123}@postgres:5432/${POSTGRES_DB:-postgres}
+      
+      # Redis 연결
+      - REDIS_URL=redis://redis:6379/${REDIS_DB:-0}
+      
+      # 외부 API
+      - TMDB_API_KEY=${TMDB_API_KEY:-88a297cdbe780782194a5cc6a9d86ec1}
+      - TMDB_BASE_URL=${TMDB_BASE_URL:-https://api.themoviedb.org/3}
+      
+      # 로깅
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+    volumes:
+      # 소스 코드 마운트 (개발 시 핫 리로드용)
+      - ${HOST_PROJECT_PATH:-/mnt/c/dev/movie-mlops}/src:/app/src
+      - ${HOST_PROJECT_PATH:-/mnt/c/dev/movie-mlops}/config:/app/config
+      - ${HOST_PROJECT_PATH:-/mnt/c/dev/movie-mlops}/data:/app/data
+      - ${HOST_PROJECT_PATH:-/mnt/c/dev/movie-mlops}/models:/app/models
+      # 로그 폴더
+      - ./logs/api:/app/logs
+    networks:
+      - movie-mlops-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: ${API_MEMORY_LIMIT:-1g}
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  movie-mlops-network:
+    external: false
