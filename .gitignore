@@ -329,6 +329,9 @@ SETUP_STATUS.md.backup
 !.vscode/extensions.json
 *.code-workspace
 
+# Obsidian (개인 노트 관리 도구)
+.obsidian/
+
 # Vim
 *.swp
 *.swo
