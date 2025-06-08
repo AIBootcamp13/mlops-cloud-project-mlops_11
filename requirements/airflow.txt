@@ -7,31 +7,23 @@
 -r base.txt
 
 # ==============================================================================
-# Apache Airflow 생태계 (제약 조건 적용 필요)
+# Airflow 추가 제공자들 (Dockerfile에서 기본 Airflow는 이미 설치됨)
 # ==============================================================================
-# 설치 방법:
-# AIRFLOW_VERSION=2.10.5
-# PYTHON_VERSION="3.11"
-# CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
-# pip install "apache-airflow==${AIRFLOW_VERSION}" --constraint "${CONSTRAINT_URL}"
+# 참고: Dockerfile에서 apache-airflow[postgres,celery]를 이미 설치하므로
+# 여기서는 추가 provider만 설치
 
-apache-airflow==2.10.5
-
-# Airflow 제공자들 (제약 조건과 호환)
-apache-airflow-providers-postgres==5.13.1
-apache-airflow-providers-celery==3.8.3
-apache-airflow-providers-redis==3.8.1
-apache-airflow-providers-http==4.12.1
-apache-airflow-providers-ftp==3.11.1
+# Airflow 추가 제공자들 (2.9.3 호환 버전)
+apache-airflow-providers-redis==3.4.0
+apache-airflow-providers-http==4.5.1
+apache-airflow-providers-ftp==3.5.2
 
 # ==============================================================================
-# 데이터베이스 (Airflow 호환)
+# 추가 데이터베이스 라이브러리
 # ==============================================================================
-psycopg2-binary==2.9.9         # PostgreSQL
-sqlalchemy==1.4.53             # ORM (Airflow + MLflow 공통)
-redis==5.0.3                   # Redis
+# 참고: psycopg2-binary와 redis는 Airflow extras에 포함됨
+# 여기서는 추가 라이브러리만 설치
 
 # ==============================================================================
-# Celery (분산 작업)
+# Celery 추가 설정
 # ==============================================================================
-celery==5.3.4                  # 분산 태스크 큐
+# 참고: celery는 Airflow extras에 포함됨
