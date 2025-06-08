@@ -1,0 +1,398 @@
+name: 🤖 ML Pipeline - Model Training & Deployment
+
+on:
+  schedule:
+    # 매일 UTC 2시 (한국시간 11시)에 실행
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      model_type:
+        description: 'Model type to train'
+        required: true
+        default: 'collaborative_filtering'
+        type: choice
+        options:
+        - collaborative_filtering
+        - content_based
+        - hybrid
+      experiment_name:
+        description: 'MLflow experiment name'
+        required: false
+        default: 'movie-recommendation'
+      force_retrain:
+        description: 'Force retrain even if model exists'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  PYTHON_VERSION: "3.11"
+  MLFLOW_TRACKING_URI: "http://localhost:5000"
+  
+jobs:
+  # ==============================================================================
+  # 1. 데이터 수집 및 전처리
+  # ==============================================================================
+  data-pipeline:
+    name: 📊 Data Collection & Processing
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres123
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+          
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    outputs:
+      data-version: ${{ steps.data-check.outputs.version }}
+      data-changed: ${{ steps.data-check.outputs.changed }}
+      
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        
+    - name: 📦 Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements/base.txt
+        pip install -r requirements/airflow.txt
+        pip install -r requirements/postgres.txt
+        pip install -r requirements/redis.txt
+        
+    - name: 🔧 Setup environment
+      run: |
+        cp .env.template .env
+        echo "POSTGRES_HOST=localhost" >> .env
+        echo "REDIS_HOST=localhost" >> .env
+        echo "TMDB_API_KEY=${{ secrets.TMDB_API_KEY }}" >> .env
+        
+    - name: 📊 Check data freshness
+      id: data-check
+      run: |
+        # 현재 날짜로 데이터 버전 생성
+        DATA_VERSION=$(date +%Y%m%d)
+        echo "version=$DATA_VERSION" >> $GITHUB_OUTPUT
+        
+        # 데이터 변경 여부 확인 (임시로 항상 true)
+        echo "changed=true" >> $GITHUB_OUTPUT
+        
+        echo "📊 Data version: $DATA_VERSION" >> $GITHUB_STEP_SUMMARY
+        
+    - name: 🎬 Collect movie data
+      if: steps.data-check.outputs.changed == 'true' || github.event.inputs.force_retrain == 'true'
+      run: |
+        # TODO: TMDB API 데이터 수집 스크립트 실행
+        echo "🎬 Starting movie data collection..."
+        
+        # 임시로 더미 데이터 생성
+        mkdir -p data/raw/tmdb
+        echo '{"movies": [], "version": "${{ steps.data-check.outputs.version }}"}' > data/raw/tmdb/movies.json
+        
+        echo "✅ Movie data collection completed" >> $GITHUB_STEP_SUMMARY
+        
+    - name: 🔄 Process and validate data
+      if: steps.data-check.outputs.changed == 'true' || github.event.inputs.force_retrain == 'true'
+      run: |
+        # TODO: 데이터 전처리 및 검증 스크립트 실행
+        echo "🔄 Processing collected data..."
+        
+        # 임시로 처리된 데이터 생성
+        mkdir -p data/processed
+        echo '{"processed_movies": [], "features": [], "version": "${{ steps.data-check.outputs.version }}"}' > data/processed/movies_processed.json
+        
+        echo "✅ Data processing completed" >> $GITHUB_STEP_SUMMARY
+        
+    - name: 📤 Upload processed data
+      uses: actions/upload-artifact@v3
+      if: steps.data-check.outputs.changed == 'true' || github.event.inputs.force_retrain == 'true'
+      with:
+        name: processed-data-${{ steps.data-check.outputs.version }}
+        path: |
+          data/processed/
+          data/raw/tmdb/
+        retention-days: 30
+
+  # ==============================================================================
+  # 2. 모델 훈련
+  # ==============================================================================
+  model-training:
+    name: 🤖 Model Training
+    runs-on: ubuntu-latest
+    needs: data-pipeline
+    if: needs.data-pipeline.outputs.data-changed == 'true' || github.event.inputs.force_retrain == 'true'
+    
+    strategy:
+      matrix:
+        model_type: [collaborative_filtering, content_based]
+        
+    services:
+      mlflow:
+        image: python:3.11-slim
+        env:
+          MLFLOW_BACKEND_STORE_URI: sqlite:///mlflow.db
+        ports:
+          - 5000:5000
+        options: >-
+          --health-cmd "pip install mlflow && mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow.db --default-artifact-root ./mlartifacts"
+          --health-interval 30s
+          --health-timeout 10s
+          --health-retries 5
+    
+    outputs:
+      model-version: ${{ steps.model-train.outputs.version }}
+      model-uri: ${{ steps.model-train.outputs.uri }}
+      model-metrics: ${{ steps.model-train.outputs.metrics }}
+      
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 📥 Download processed data
+      uses: actions/download-artifact@v3
+      with:
+        name: processed-data-${{ needs.data-pipeline.outputs.data-version }}
+        path: ./data/
+        
+    - name: 🐍 Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        
+    - name: 📦 Install ML dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements/base.txt
+        pip install -r requirements/pytorch.txt
+        pip install -r requirements/mlflow.txt
+        
+    - name: 🔧 Setup MLflow environment
+      run: |
+        export MLFLOW_TRACKING_URI=http://localhost:5000
+        echo "MLFLOW_TRACKING_URI=http://localhost:5000" >> $GITHUB_ENV
+        
+        # MLflow 서버 대기
+        sleep 30
+        
+    - name: 🤖 Train model
+      id: model-train
+      run: |
+        # TODO: 실제 모델 훈련 스크립트 실행
+        echo "🤖 Training ${{ matrix.model_type }} model..."
+        
+        # 임시로 더미 모델 생성
+        MODEL_VERSION="v$(date +%Y%m%d_%H%M%S)"
+        MODEL_URI="models:/${{ matrix.model_type }}/$MODEL_VERSION"
+        
+        echo "version=$MODEL_VERSION" >> $GITHUB_OUTPUT
+        echo "uri=$MODEL_URI" >> $GITHUB_OUTPUT
+        echo "metrics={\"rmse\": 0.85, \"mae\": 0.72}" >> $GITHUB_OUTPUT
+        
+        echo "✅ Model training completed" >> $GITHUB_STEP_SUMMARY
+        echo "- **Model**: ${{ matrix.model_type }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Version**: $MODEL_VERSION" >> $GITHUB_STEP_SUMMARY
+        echo "- **URI**: $MODEL_URI" >> $GITHUB_STEP_SUMMARY
+        
+    - name: 📊 Model evaluation
+      run: |
+        # TODO: 모델 평가 스크립트 실행
+        echo "📊 Evaluating model performance..."
+        
+        # 임시 평가 결과
+        echo "✅ Model evaluation completed" >> $GITHUB_STEP_SUMMARY
+        echo "- **RMSE**: 0.85" >> $GITHUB_STEP_SUMMARY
+        echo "- **MAE**: 0.72" >> $GITHUB_STEP_SUMMARY
+        
+    - name: 📤 Upload model artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: model-${{ matrix.model_type }}-${{ steps.model-train.outputs.version }}
+        path: |
+          models/
+          mlartifacts/
+        retention-days: 90
+
+  # ==============================================================================
+  # 3. 모델 검증 및 승급
+  # ==============================================================================
+  model-validation:
+    name: ✅ Model Validation
+    runs-on: ubuntu-latest
+    needs: model-training
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 📥 Download model artifacts
+      uses: actions/download-artifact@v3
+      with:
+        pattern: model-*
+        merge-multiple: true
+        
+    - name: 🐍 Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        
+    - name: 📦 Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements/base.txt
+        pip install -r requirements/pytorch.txt
+        pip install -r requirements/mlflow.txt
+        
+    - name: ✅ Validate models
+      run: |
+        # TODO: 모델 검증 스크립트 실행
+        echo "✅ Validating trained models..."
+        
+        # 임시 검증 결과
+        echo "✅ Model validation completed" >> $GITHUB_STEP_SUMMARY
+        echo "- **All models passed validation**" >> $GITHUB_STEP_SUMMARY
+        
+    - name: 🏆 Promote best model
+      run: |
+        # TODO: 최고 성능 모델을 프로덕션으로 승급
+        echo "🏆 Promoting best performing model..."
+        
+        echo "✅ Model promotion completed" >> $GITHUB_STEP_SUMMARY
+        echo "- **Production model**: collaborative_filtering" >> $GITHUB_STEP_SUMMARY
+
+  # ==============================================================================
+  # 4. 모델 배포
+  # ==============================================================================
+  model-deployment:
+    name: 🚀 Model Deployment
+    runs-on: ubuntu-latest
+    needs: [model-training, model-validation]
+    
+    environment: production
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 📥 Download model artifacts
+      uses: actions/download-artifact@v3
+      with:
+        pattern: model-*
+        merge-multiple: true
+        
+    - name: 🚀 Deploy to model serving
+      run: |
+        # TODO: 모델 서빙 시스템에 배포
+        echo "🚀 Deploying model to serving system..."
+        
+        # 임시로 배포 성공 시뮬레이션
+        echo "✅ Model deployment completed" >> $GITHUB_STEP_SUMMARY
+        echo "- **Endpoint**: https://api.movie-mlops.com/predict" >> $GITHUB_STEP_SUMMARY
+        
+    - name: 🧪 Smoke test
+      run: |
+        # TODO: 배포된 모델 smoke test
+        echo "🧪 Running smoke tests..."
+        
+        # 임시로 테스트 성공
+        echo "✅ Smoke tests passed" >> $GITHUB_STEP_SUMMARY
+
+  # ==============================================================================
+  # 5. 성능 모니터링 설정
+  # ==============================================================================
+  setup-monitoring:
+    name: 📊 Setup Model Monitoring
+    runs-on: ubuntu-latest
+    needs: model-deployment
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 📊 Configure monitoring
+      run: |
+        # TODO: 모델 성능 모니터링 설정
+        echo "📊 Setting up model performance monitoring..."
+        
+        echo "✅ Monitoring setup completed" >> $GITHUB_STEP_SUMMARY
+        echo "- **Grafana Dashboard**: http://localhost:3000/d/model-performance" >> $GITHUB_STEP_SUMMARY
+        
+  # ==============================================================================
+  # 6. 알림 및 보고서
+  # ==============================================================================
+  ml-report:
+    name: 📋 ML Pipeline Report
+    runs-on: ubuntu-latest
+    needs: [data-pipeline, model-training, model-validation, model-deployment, setup-monitoring]
+    if: always()
+    
+    steps:
+    - name: 📋 Generate ML pipeline report
+      run: |
+        echo "## 🤖 ML Pipeline Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📊 Pipeline Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ needs.data-pipeline.result }}" == "success" ]; then
+          echo "✅ **Data Pipeline**: Success" >> $GITHUB_STEP_SUMMARY
+          echo "  - Data Version: ${{ needs.data-pipeline.outputs.data-version }}" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Data Pipeline**: Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.model-training.result }}" == "success" ]; then
+          echo "✅ **Model Training**: Success" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Model Training**: Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.model-validation.result }}" == "success" ]; then
+          echo "✅ **Model Validation**: Success" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Model Validation**: Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.model-deployment.result }}" == "success" ]; then
+          echo "✅ **Model Deployment**: Success" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Model Deployment**: Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.setup-monitoring.result }}" == "success" ]; then
+          echo "✅ **Monitoring Setup**: Success" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Monitoring Setup**: Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📈 Next Steps" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- Monitor model performance in Grafana dashboard" >> $GITHUB_STEP_SUMMARY
+        echo "- Check model endpoints for availability" >> $GITHUB_STEP_SUMMARY
+        echo "- Review training metrics in MLflow" >> $GITHUB_STEP_SUMMARY

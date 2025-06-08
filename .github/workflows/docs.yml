@@ -1,0 +1,533 @@
+name: 📚 Documentation Update
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'pyproject.toml'
+      - 'requirements/**'
+  workflow_dispatch:
+
+jobs:
+  # ==============================================================================
+  # 1. 문서 검증
+  # ==============================================================================
+  validate-docs:
+    name: ✅ Validate Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 📝 Validate Markdown files
+      run: |
+        echo "📝 Validating Markdown files..."
+        
+        # 기본 마크다운 문법 검사
+        find . -name "*.md" -not -path "./node_modules/*" -not -path "./.git/*" | while read -r file; do
+          echo "Checking $file..."
+          # 기본적인 마크다운 구조 검사
+          if grep -q "^#" "$file"; then
+            echo "✅ $file has headers"
+          else
+            echo "⚠️ $file may be missing headers"
+          fi
+        done
+        
+    - name: 🔗 Check internal links
+      run: |
+        echo "🔗 Checking internal documentation links..."
+        
+        # docs 폴더 내 상호 참조 링크 검사
+        find docs/ -name "*.md" | while read -r file; do
+          echo "Checking links in $file..."
+          
+          # 상대 경로 링크 추출 및 검사
+          grep -o '\[.*\](\.\/.*\.md)' "$file" | sed 's/.*](\(.*\))/\1/' | while read -r link; do
+            if [ -f "$(dirname "$file")/$link" ]; then
+              echo "✅ Link exists: $link"
+            else
+              echo "❌ Broken link: $link in $file"
+            fi
+          done
+        done
+        
+    - name: 📊 Generate docs validation report
+      run: |
+        echo "## 📚 Documentation Validation" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Markdown syntax validation completed" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Internal link validation completed" >> $GITHUB_STEP_SUMMARY
+
+  # ==============================================================================
+  # 2. API 문서 자동 생성
+  # ==============================================================================
+  generate-api-docs:
+    name: 📖 Generate API Documentation
+    runs-on: ubuntu-latest
+    needs: validate-docs
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+        cache: 'pip'
+        
+    - name: 📦 Install documentation dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements/base.txt
+        pip install -r requirements/api.txt
+        pip install sphinx sphinx-rtd-theme sphinx-autoapi
+        
+    - name: 📖 Generate API documentation
+      run: |
+        echo "📖 Generating API documentation..."
+        
+        # Sphinx 문서 생성을 위한 기본 구조 생성
+        mkdir -p docs/api
+        
+        # 임시로 API 문서 구조 생성
+        cat > docs/api/index.md << 'EOF'
+# 🚀 Movie MLOps API Documentation
+
+## 개요
+Movie MLOps 시스템의 REST API 문서입니다.
+
+## 엔드포인트
+
+### 🎬 영화 추천 API
+
+#### GET /api/v1/recommendations
+사용자를 위한 영화 추천 목록을 반환합니다.
+
+**Parameters:**
+- `user_id` (int): 사용자 ID
+- `k` (int, optional): 추천할 영화 개수 (기본값: 10)
+
+**Response:**
+```json
+{
+  "recommendations": [
+    {
+      "movie_id": 123,
+      "title": "영화 제목",
+      "score": 0.95
+    }
+  ]
+}
+```
+
+#### POST /api/v1/feedback
+사용자 피드백을 수집합니다.
+
+**Request Body:**
+```json
+{
+  "user_id": 123,
+  "movie_id": 456,
+  "rating": 4.5,
+  "action": "like"
+}
+```
+
+### 🔍 헬스 체크
+
+#### GET /health
+시스템 상태를 확인합니다.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-06-08T10:00:00Z",
+  "services": {
+    "database": "healthy",
+    "model": "healthy"
+  }
+}
+```
+EOF
+        
+        echo "✅ API documentation generated" >> $GITHUB_STEP_SUMMARY
+        
+    - name: 📤 Upload API docs
+      uses: actions/upload-artifact@v3
+      with:
+        name: api-documentation
+        path: docs/api/
+
+  # ==============================================================================
+  # 3. 의존성 문서 업데이트
+  # ==============================================================================
+  update-dependency-docs:
+    name: 📦 Update Dependency Documentation
+    runs-on: ubuntu-latest
+    needs: validate-docs
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: 🐍 Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+        cache: 'pip'
+        
+    - name: 📦 Generate dependency documentation
+      run: |
+        echo "📦 Generating dependency documentation..."
+        
+        # 의존성 매트릭스 자동 업데이트
+        cat > docs/overview/DEPENDENCY_STATUS.md << 'EOF'
+---
+title: 의존성 상태 보고서 (자동 생성)
+description: 현재 설치된 패키지들의 상태 및 버전 정보
+generated: true
+date: $(date +%Y-%m-%d)
+---
+
+# 📦 의존성 상태 보고서
+
+> **자동 생성 문서**: 이 문서는 GitHub Actions에 의해 자동으로 생성됩니다.
+
+## 📊 패키지 현황
+
+### 핵심 패키지 버전
+EOF
+        
+        # requirements 파일들 분석하여 주요 패키지 버전 추출
+        echo "" >> docs/overview/DEPENDENCY_STATUS.md
+        echo "| 패키지 | 현재 버전 | 범주 |" >> docs/overview/DEPENDENCY_STATUS.md
+        echo "|--------|-----------|------|" >> docs/overview/DEPENDENCY_STATUS.md
+        
+        # base.txt에서 주요 패키지 추출
+        if [ -f "requirements/base.txt" ]; then
+          grep -E "^(numpy|pandas|scikit-learn)" requirements/base.txt | while read -r line; do
+            package=$(echo "$line" | cut -d'=' -f1)
+            version=$(echo "$line" | cut -d'=' -f3)
+            echo "| $package | $version | 기본 |" >> docs/overview/DEPENDENCY_STATUS.md
+          done
+        fi
+        
+        # 다른 requirements 파일들도 처리
+        for req_file in requirements/*.txt; do
+          if [ "$req_file" != "requirements/base.txt" ]; then
+            service=$(basename "$req_file" .txt)
+            echo "" >> docs/overview/DEPENDENCY_STATUS.md
+            echo "### $service 서비스" >> docs/overview/DEPENDENCY_STATUS.md
+            echo "" >> docs/overview/DEPENDENCY_STATUS.md
+            
+            # 첫 번째 주요 패키지만 표시
+            head -5 "$req_file" | grep -v "^#" | grep -v "^-r" | while read -r line; do
+              if [ -n "$line" ]; then
+                echo "- \`$line\`" >> docs/overview/DEPENDENCY_STATUS.md
+              fi
+            done
+          fi
+        done
+        
+        echo "" >> docs/overview/DEPENDENCY_STATUS.md
+        echo "## 🔄 업데이트 정보" >> docs/overview/DEPENDENCY_STATUS.md
+        echo "" >> docs/overview/DEPENDENCY_STATUS.md
+        echo "- **마지막 업데이트**: $(date)" >> docs/overview/DEPENDENCY_STATUS.md
+        echo "- **다음 예정 업데이트**: 매주 월요일 자동 실행" >> docs/overview/DEPENDENCY_STATUS.md
+        echo "- **보안 스캔**: CI/CD에서 자동 실행" >> docs/overview/DEPENDENCY_STATUS.md
+        
+        echo "✅ Dependency documentation updated" >> $GITHUB_STEP_SUMMARY
+        
+    - name: 📝 Commit dependency docs
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        if git diff --quiet docs/overview/DEPENDENCY_STATUS.md; then
+          echo "No changes to dependency documentation"
+        else
+          git add docs/overview/DEPENDENCY_STATUS.md
+          git commit -m "📦 Update dependency documentation [skip ci]"
+          git push
+        fi
+
+  # ==============================================================================
+  # 4. 아키텍처 다이어그램 생성
+  # ==============================================================================
+  generate-architecture-diagrams:
+    name: 🏗️ Generate Architecture Diagrams
+    runs-on: ubuntu-latest
+    needs: validate-docs
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🎨 Install diagram tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python3-pip graphviz
+        pip install diagrams
+        
+    - name: 🏗️ Generate architecture diagrams
+      run: |
+        echo "🏗️ Generating architecture diagrams..."
+        
+        mkdir -p docs/diagrams
+        
+        # Python 스크립트로 아키텍처 다이어그램 생성
+        cat > generate_diagrams.py << 'EOF'
+from diagrams import Diagram, Cluster, Edge
+from diagrams.onprem.container import Docker
+from diagrams.onprem.database import PostgreSQL, Redis
+from diagrams.onprem.monitoring import Prometheus, Grafana
+from diagrams.programming.framework import FastAPI, React
+from diagrams.programming.language import Python
+from diagrams.onprem.workflow import Airflow
+from diagrams.onprem.queue import Kafka
+
+# MLOps 전체 아키텍처 다이어그램
+with Diagram("MLOps 9아키텍처 전체 구조", filename="docs/diagrams/mlops_architecture", show=False):
+    with Cluster("1+5아키텍처: Airflow 생태계"):
+        airflow = Airflow("Apache Airflow")
+    
+    with Cluster("2아키텍처: 피처 스토어"):
+        feast = Python("Feast")
+    
+    with Cluster("3+4아키텍처: Git 생태계"):
+        git = Python("Git + GitHub Actions")
+    
+    with Cluster("6아키텍처: 모델 레지스트리"):
+        mlflow = Python("MLflow")
+    
+    with Cluster("7아키텍처: ML 프레임워크"):
+        pytorch = Python("PyTorch")
+        api = FastAPI("FastAPI")
+    
+    with Cluster("8아키텍처: 모니터링"):
+        prometheus = Prometheus("Prometheus")
+        grafana = Grafana("Grafana")
+    
+    with Cluster("9아키텍처: 이벤트 기반"):
+        kafka = Kafka("Apache Kafka")
+    
+    with Cluster("데이터베이스"):
+        postgres = PostgreSQL("PostgreSQL")
+        redis = Redis("Redis")
+    
+    # 연결 관계
+    airflow >> feast
+    airflow >> mlflow
+    mlflow >> pytorch
+    pytorch >> api
+    api >> kafka
+    prometheus >> grafana
+    
+    postgres >> [airflow, mlflow]
+    redis >> [airflow, feast]
+
+print("✅ Architecture diagram generated")
+EOF
+        
+        python generate_diagrams.py
+        
+        echo "✅ Architecture diagrams generated" >> $GITHUB_STEP_SUMMARY
+        
+    - name: 📤 Upload diagrams
+      uses: actions/upload-artifact@v3
+      with:
+        name: architecture-diagrams
+        path: docs/diagrams/
+
+  # ==============================================================================
+  # 5. 문서 사이트 배포 (GitHub Pages)
+  # ==============================================================================
+  deploy-docs:
+    name: 🚀 Deploy Documentation Site
+    runs-on: ubuntu-latest
+    needs: [generate-api-docs, update-dependency-docs, generate-architecture-diagrams]
+    if: github.ref == 'refs/heads/main'
+    
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+      
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+      
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 📥 Download generated docs
+      uses: actions/download-artifact@v3
+      with:
+        pattern: '*-documentation'
+        merge-multiple: true
+        path: ./generated-docs/
+        
+    - name: 📥 Download diagrams
+      uses: actions/download-artifact@v3
+      with:
+        name: architecture-diagrams
+        path: ./docs/diagrams/
+        
+    - name: 🔧 Setup GitHub Pages
+      uses: actions/configure-pages@v3
+      
+    - name: 📚 Build documentation site
+      run: |
+        echo "📚 Building documentation site..."
+        
+        # 문서 사이트 구조 생성
+        mkdir -p _site
+        
+        # 기본 HTML 구조 생성
+        cat > _site/index.html << 'EOF'
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie MLOps Documentation</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 40px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .card { border: 1px solid #ddd; border-radius: 8px; padding: 20px; }
+        .card h3 { margin-top: 0; color: #0066cc; }
+        .link { color: #0066cc; text-decoration: none; }
+        .link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 Movie MLOps Documentation</h1>
+            <p>영화 추천 시스템을 위한 MLOps 9아키텍처 문서</p>
+        </div>
+        
+        <div class="grid">
+            <div class="card">
+                <h3>📖 Overview</h3>
+                <p>MLOps 아키텍처 전체 개요</p>
+                <a href="overview/" class="link">문서 보기 →</a>
+            </div>
+            
+            <div class="card">
+                <h3>🚀 Setup</h3>
+                <p>시스템 설정 및 설치 가이드</p>
+                <a href="setup/" class="link">문서 보기 →</a>
+            </div>
+            
+            <div class="card">
+                <h3>🔧 API Reference</h3>
+                <p>REST API 사용법 및 엔드포인트</p>
+                <a href="api/" class="link">문서 보기 →</a>
+            </div>
+            
+            <div class="card">
+                <h3>🏗️ Architecture</h3>
+                <p>시스템 아키텍처 다이어그램</p>
+                <a href="diagrams/" class="link">다이어그램 보기 →</a>
+            </div>
+        </div>
+        
+        <div style="margin-top: 40px; text-align: center; color: #666;">
+            <p>🔄 Last updated: $(date)</p>
+            <p>📊 Generated by GitHub Actions</p>
+        </div>
+    </div>
+</body>
+</html>
+EOF
+        
+        # 기존 문서들을 _site로 복사
+        cp -r docs/* _site/ 2>/dev/null || true
+        cp -r generated-docs/* _site/ 2>/dev/null || true
+        
+        # README를 HTML로 변환 (간단한 방법)
+        if command -v pandoc &> /dev/null; then
+          pandoc README.md -o _site/readme.html
+        fi
+        
+        echo "✅ Documentation site built" >> $GITHUB_STEP_SUMMARY
+        
+    - name: 📤 Upload Pages artifact
+      uses: actions/upload-pages-artifact@v2
+      with:
+        path: '_site'
+        
+    - name: 🚀 Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v2
+
+  # ==============================================================================
+  # 6. 문서 품질 보고서
+  # ==============================================================================
+  docs-quality-report:
+    name: 📊 Documentation Quality Report
+    runs-on: ubuntu-latest
+    needs: [validate-docs, generate-api-docs, update-dependency-docs, generate-architecture-diagrams, deploy-docs]
+    if: always()
+    
+    steps:
+    - name: 📊 Generate quality metrics
+      run: |
+        echo "📊 Generating documentation quality report..."
+        
+        # 문서 상태 요약
+        echo "## 📚 Documentation Quality Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ needs.validate-docs.result }}" == "success" ]; then
+          echo "✅ **Documentation Validation**: Passed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Documentation Validation**: Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.generate-api-docs.result }}" == "success" ]; then
+          echo "✅ **API Documentation**: Generated" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **API Documentation**: Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.update-dependency-docs.result }}" == "success" ]; then
+          echo "✅ **Dependency Documentation**: Updated" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Dependency Documentation**: Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.generate-architecture-diagrams.result }}" == "success" ]; then
+          echo "✅ **Architecture Diagrams**: Generated" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Architecture Diagrams**: Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.deploy-docs.result }}" == "success" ]; then
+          echo "✅ **Documentation Site**: Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "  - 🔗 [View Documentation Site](${{ needs.deploy-docs.outputs.page_url }})" >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ needs.deploy-docs.result }}" == "skipped" ]; then
+          echo "⏭️ **Documentation Site**: Skipped (not main branch)" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Documentation Site**: Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📈 Recommendations" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- Review and fix any failed validation checks" >> $GITHUB_STEP_SUMMARY
+        echo "- Keep API documentation synchronized with code changes" >> $GITHUB_STEP_SUMMARY
+        echo "- Regularly update architecture diagrams" >> $GITHUB_STEP_SUMMARY
+        echo "- Monitor documentation site accessibility" >> $GITHUB_STEP_SUMMARY
