@@ -1,0 +1,540 @@
+# ==============================================================================
+# WSL Docker 환경 Movie MLOps Git 무시 목록
+# ==============================================================================
+
+# ==============================================================================
+# Python 관련
+# ==============================================================================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+#Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments (.env 파일은 WSL Docker에서 중요!)
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# 임시 백업 폴더 (수동 삭제 필요)
+venv_backup_to_delete/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# ==============================================================================
+# WSL Docker 특화 제외 항목
+# ==============================================================================
+# Docker 볼륨 데이터 (중요: 실제 데이터는 제외)
+docker/volumes/
+docker/data/
+
+# Docker Compose override 파일
+docker-compose.override.yml
+docker-compose.local.yml
+docker-compose.*.local.yml
+
+# WSL 파일 시스템 특화
+.wslconfig
+wsl.conf
+
+# Docker Desktop WSL 설정
+.docker/
+
+# ==============================================================================
+# 환경 변수 및 시크릿 (보안 중요!)
+# ==============================================================================
+# 실제 환경 변수 파일들
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 시크릿 파일들
+secrets/
+*.key
+*.pem
+*.crt
+credentials.json
+service-account.json
+
+# API 키 파일들
+*apikey*
+*api-key*
+*api_key*
+
+# ==============================================================================
+# Docker 관련
+# ==============================================================================
+# Docker 컨테이너 데이터
+/data/
+/logs/
+/models/
+
+# Docker 볼륨 마운트 포인트
+postgres_data/
+redis_data/
+mlflow_data/
+grafana_data/
+prometheus_data/
+kafka_data/
+zookeeper_data/
+
+# Docker 임시 파일들
+.dockerignore.local
+
+# ==============================================================================
+# MLOps 서비스별 데이터
+# ==============================================================================
+
+# 1아키텍처 + 5아키텍처: Apache Airflow
+airflow/logs/
+logs/scheduler/
+logs/webserver/
+logs/worker/
+logs/airflow/
+airflow.db
+airflow.cfg
+webserver_config.py
+standalone_admin_password.txt
+airflow-webserver.pid
+airflow-scheduler.pid
+
+# 2아키텍처: Feast 피처 스토어
+.feast/
+registry.pb
+feast_repo/data/
+feature_store.yaml
+online_store.db
+logs/feast/
+
+# 6아키텍처: MLflow
+mlruns/
+mlartifacts/
+mlflow.db
+logs/mlflow/
+
+# 7아키텍처: PyTorch
+*.pth
+*.pt
+*.ckpt
+.torch/
+.nv/
+logs/pytorch/
+
+# 8아키텍처: Prometheus + Grafana
+prometheus/data/
+grafana/data/
+grafana/logs/
+grafana.db
+logs/prometheus/
+logs/grafana/
+
+# 9아키텍처: Apache Kafka
+kafka-logs/
+zookeeper/
+logs/kafka/
+logs/zookeeper/
+
+# FastAPI 로그
+logs/api/
+
+# PostgreSQL 로그
+logs/postgres/
+
+# Redis 로그
+logs/redis/
+
+# ==============================================================================
+# 데이터 디렉터리 (크기가 큰 파일들)
+# ==============================================================================
+# 원시 데이터
+data/raw/
+data/external/
+data/downloads/
+
+# 처리된 데이터
+data/processed/
+data/interim/
+data/cache/
+
+# 모델 파일들
+models/trained/
+models/deployed/
+models/experiments/
+*.pkl
+*.joblib
+*.h5
+*.model
+
+# 피처 파일들
+features/
+*.parquet
+*.feather
+*.arrow
+
+# ==============================================================================
+# 로그 및 임시 파일들
+# ==============================================================================
+# 모든 로그 파일
+logs/
+*.log
+*.log.*
+*.out
+
+# 임시 디렉터리
+temp/
+tmp/
+temp-cleanup/
+.tmp/
+
+# 백업 파일들
+*.bak
+*.backup
+*.old
+*~
+
+# 임시 문서 파일들 (정리 후 삭제 예정)
+*.backup
+WSL_DOCKER_INTEGRATION_COMPLETE.md.backup
+SETUP_STATUS.md.backup
+
+# ==============================================================================
+# IDEs and Editors
+# ==============================================================================
+# PyCharm
+.idea/
+
+# VSCode (WSL 개발 시 유용한 설정은 유지)
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ==============================================================================
+# OS 생성 파일들
+# ==============================================================================
+# Windows
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Linux
+*~
+
+# ==============================================================================
+# 아카이브 및 압축 파일들
+# ==============================================================================
+*.zip
+*.tar.gz
+*.rar
+*.7z
+*.gz
+*.bz2
+
+# ==============================================================================
+# Jupyter Notebook 관련
+# ==============================================================================
+# 노트북 체크포인트
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# 노트북 출력 (개인 실험)
+notebooks/experiments/
+notebooks/scratch/
+notebooks/*_scratch.ipynb
+notebooks/temp_*.ipynb
+
+# ==============================================================================
+# 테스트 및 분석 결과
+# ==============================================================================
+# 실험 결과
+experiments/
+reports/
+results/
+outputs/
+
+# Test 결과
+.pytest_cache/
+test-results/
+test_*.xml
+
+# Coverage 결과
+.coverage
+coverage.xml
+htmlcov/
+
+# Performance 분석
+*.prof
+profile_*.html
+
+# ==============================================================================
+# 캐시 디렉터리
+# ==============================================================================
+.cache/
+cache/
+*.cache
+.pip-cache/
+
+# ==============================================================================
+# Node.js / Frontend (모니터링 대시보드 등)
+# ==============================================================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+build/
+dist/
+
+# ==============================================================================
+# 프로덕션 및 민감한 설정
+# ==============================================================================
+# 프로덕션 설정 파일들
+config/production/
+config/staging/
+prod.env
+staging.env
+production.yml
+staging.yml
+
+# SSL 인증서
+*.crt
+*.key
+*.pem
+*.p12
+*.pfx
+
+# 데이터베이스 덤프
+*.sql
+*.dump
+
+# ==============================================================================
+# 사용자 정의 및 로컬 설정
+# ==============================================================================
+# 로컬 설정 파일들
+.gitignore.local
+.env.local
+local_settings.py
+
+# 개인 노트
+NOTES.md
+TODO.md
+SCRATCH.md
+
+# 개발자별 설정
+.user_settings
+.personal/
+
+# ==============================================================================
+# WSL Docker 성능 최적화 관련
+# ==============================================================================
+# WSL 캐시
+.wsl_cache/
+
+# Docker BuildKit 캐시
+.docker-cache/
+
+# ==============================================================================
+# 문서 빌드 결과
+# ==============================================================================
+# Sphinx 빌드
+docs/_build/
+docs/build/
+
+# MkDocs
+site/
+
+# ==============================================================================
+# 모니터링 및 메트릭
+# ==============================================================================
+# 메트릭 데이터
+metrics/
+monitoring/data/
+
+# ==============================================================================
+# 기타 제외 항목
+# ==============================================================================
+# 에디터 임시 파일
+.*.swp
+.*.swo
+
+# 프로젝트별 임시 파일
+*.tmp
+*.temp
+
+# 시스템 파일
+.directory
+desktop.ini
+
+# Python 컴파일된 확장
+*.so
+*.dylib
+*.dll
+
+# 설치 파키지
+*.deb
+*.rpm
+*.msi
+*.exe
+
+# ==============================================================================
+# 중요: 포함해야 할 파일들 (예외)
+# ==============================================================================
+# 템플릿 파일들은 포함
+!.env.template
+!docker-compose.*.yml
+!Dockerfile*
+!requirements/*.txt
+
+# 설정 예시 파일들
+!config/*.template
+!config/*.example
+
+# 문서 파일들
+!docs/**/*.md
+!*.md
+
+# 스크립트 파일들
+!scripts/**/*.sh
+!*.sh
