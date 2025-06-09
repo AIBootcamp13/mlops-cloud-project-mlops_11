@@ -77,74 +77,80 @@ stop_all_stacks() {
 start_infrastructure() {
     echo -e "${GREEN}🏗️ 인프라 스택 시작...${NC}"
     
-    # 2번의 네트워크 로직
+    # 네트워크 확인
     ensure_movie_mlops_network
     
-    # 2번의 인프라 스택 로직 그대로 사용
+    # 기존 인프라 컨테이너만 제거
+    cleanup_infrastructure_containers
+    
+    # 인프라 스택 시작
     start_infrastructure_stack
     
-    # 2번의 URL 출력
+    # URL 출력
     show_infrastructure_urls
 }
 
 start_api_stack() {
     echo -e "${GREEN}💻 API 스택 시작...${NC}"
     
-    # 2번의 네트워크 로직
+    # 네트워크 확인
     ensure_movie_mlops_network
     
-    # 2번에서 API는 인프라 스택 위에서 동작하므로 인프라 먼저 시작
-    start_infrastructure_stack
+    # 기존 API 컨테이너만 제거 (인프라는 유지)
+    cleanup_api_containers
     
-    # 2번의 API 스택 로직 그대로 사용 (ML 스택에서 API 부분만)
+    # API 스택 시작
     start_api_stack_all
     
-    # 2번의 URL 출력
+    # URL 출력
     show_api_urls
 }
 
 start_ml_stack() {
     echo -e "${GREEN}🤖 ML 스택 시작...${NC}"
     
-    # 2번의 네트워크 로직
+    # 네트워크 확인
     ensure_movie_mlops_network
     
-    # 2번에서 ML은 인프라 스택 위에서 동작하므로 인프라 먼저 시작
-    start_infrastructure_stack
+    # 기존 ML 컨테이너만 제거 (인프라는 유지)
+    cleanup_ml_containers
     
-    # 2번의 ML 전용 스택 로직 그대로 사용 (Feast + MLflow + Jupyter만)
+    # ML 스택 시작
     start_ml_only_stack_all
     
-    # 2번의 URL 출력
+    # URL 출력
     show_ml_urls
 }
 
 start_workflow_stack() {
     echo -e "${GREEN}🔄 워크플로우 스택 시작...${NC}"
     
-    # 2번의 네트워크 로직
+    # 네트워크 확인
     ensure_movie_mlops_network
     
-    # 2번에서 워크플로우는 인프라 스택 위에서 동작하므로 인프라 먼저 시작
-    start_infrastructure_stack
+    # 기존 워크플로우 컨테이너만 제거 (인프라는 유지)
+    cleanup_workflow_containers
     
-    # 2번의 워크플로우 스택 로직 그대로 사용 (Airflow만)
+    # 워크플로우 스택 시작
     start_workflow_stack_all
     
-    # 2번의 URL 출력
+    # URL 출력
     show_workflow_urls
 }
 
 start_monitoring_stack() {
     echo -e "${GREEN}📊 모니터링 스택 시작...${NC}"
     
-    # 2번의 네트워크 로직
+    # 네트워크 확인
     ensure_movie_mlops_network
     
-    # 2번의 모니터링 스택 로직 그대로 사용
+    # 기존 모니터링 컨테이너만 제거
+    cleanup_monitoring_containers
+    
+    # 모니터링 스택 시작
     start_monitoring_stack_all
     
-    # 2번의 URL 출력
+    # URL 출력
     show_monitoring_urls
 }
 
@@ -367,12 +373,12 @@ main() {
             1) setup_environment ;;
             2) start_all_stacks ;;
             3) stop_all_stacks ;;
-            4) clean_containers ;;
-            5) start_infrastructure ;;
-            6) start_api_stack ;;
-            7) start_ml_stack ;;
-            8) start_workflow_stack ;;
-            9) start_monitoring_stack ;;
+            4) start_infrastructure ;;
+            5) start_api_stack ;;
+            6) start_ml_stack ;;
+            7) start_workflow_stack ;;
+            8) start_monitoring_stack ;;
+            9) clean_containers ;;
             10) start_dev_environment ;;
             11) start_workflow_environment ;;
             12) start_ml_dev_environment ;;
