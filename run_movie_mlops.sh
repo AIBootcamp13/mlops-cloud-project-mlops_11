@@ -27,26 +27,31 @@ start_all_stacks() {
     
     # 1단계: 인프라 스택 (4번)
     echo "🏗️ 4번: 인프라 스택 시작..."
+    cleanup_infrastructure_containers
     start_infrastructure_stack  # 직접 호출로 중복 방지
     show_infrastructure_urls
     
     # 2단계: API 스택 (5번) - 인프라 위에서 동작
     echo "💻 5번: API 스택 시작..."
+    cleanup_api_containers
     start_api_stack_all  # 직접 호출로 중복 방지
     show_api_urls
     
     # 3단계: ML 스택 (6번) - 인프라 위에서 동작
     echo "🤖 6번: ML 스택 시작..."
-    start_ml_only_stack_all  # 직접 호출로 중복 방지
+    cleanup_ml_containers
+    start_ml_stack_all  # 2번 메뉴에서는 전체 ML 스택 시작
     show_ml_urls
     
     # 4단계: 워크플로우 스택 (7번) - 인프라 위에서 동작
     echo "🔄 7번: 워크플로우 스택 시작..."
+    cleanup_workflow_containers
     start_workflow_stack_all  # 직접 호출로 중복 방지
     show_workflow_urls
     
     # 5단계: 모니터링 스택 (8번) - 독립적 동작
     echo "📊 8번: 모니터링 스택 시작..."
+    cleanup_monitoring_containers
     start_monitoring_stack_all  # 직접 호출로 중복 방지
     show_monitoring_urls
     
@@ -99,8 +104,8 @@ start_api_stack() {
     # 기존 API 컨테이너만 제거 (인프라는 유지)
     cleanup_api_containers
     
-    # API 스택 시작
-    start_api_stack_all
+    # API 스택 시작 (독립 실행용)
+    start_api_stack_standalone
     
     # URL 출력
     show_api_urls

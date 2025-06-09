@@ -21,6 +21,7 @@ RUN apt-get update && apt-get install -y \
     wget \
     git \
     build-essential \
+    redis-tools \
     && rm -rf /var/lib/apt/lists/*
 
 # 작업 디렉토리 설정
@@ -39,11 +40,18 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Feast 리포지토리 디렉토리 생성
 RUN mkdir -p /app/feast_repo /app/data /app/logs
 
-# 소스 코드 복사
-COPY src/ /app/src/
+# Feast 전용 소스코드만 복사 (완전히 분리)
+COPY src/features/ /app/src/features/
+COPY src/utils/ /app/src/utils/
+# src/api/ 디렉토리는 절대 복사하지 않음
+# src/main.py 또한 복사하지 않음
 
-# 설정 파일 복사 (필요시)
-# COPY config/ /app/config/
+# Feast 저장소 설정 복사
+COPY feast_repo/ /app/feast_repo/
+COPY config/feast/ /app/config/feast/
+
+# 시작 스크립트에 실행 권한 부여
+RUN chmod +x /app/feast_repo/start_feast.sh
 
 # 비root 사용자 생성
 RUN adduser --disabled-password --gecos '' feastuser && \
@@ -60,4 +68,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:6567/ || exit 1
 
 # 컨테이너 시작 시 실행할 명령 (환경변수 사용)
-CMD ["feast", "serve", "--host", "0.0.0.0", "--port", "6567"]
+CMD ["/app/feast_repo/start_feast.sh"]

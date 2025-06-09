@@ -13,6 +13,41 @@
 
 services:
   # =============================================================================
+  # 기본 인프라 서비스
+  # =============================================================================
+  
+  # Redis - 인메모리 데이터베이스 (캠시, 대기열 등)
+  redis:
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    container_name: movie-mlops-redis
+    restart: unless-stopped
+    command: >
+      redis-server 
+      --appendonly yes 
+      --appendfsync everysec
+      --maxmemory ${REDIS_MEMORY_LIMIT:-512m}
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+      - ${LOGS_VOLUME_PATH:-./logs}/redis:/var/log/redis
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    networks:
+      - movie-mlops-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: ${REDIS_MEMORY_LIMIT:-512m}
+
+  # =============================================================================
   # ML 핵심 도구들
   # =============================================================================
   
@@ -57,20 +92,23 @@ services:
     environment:
       FEAST_REPO_PATH: ${FEAST_REPO_PATH:-/app/feast_repo}
       FEAST_REGISTRY_PATH: ${FEAST_REGISTRY_PATH:-/app/feast_repo/data/registry.db}
+      FEAST_PORT: ${FEAST_PORT:-6567}
       PYTHONPATH: /app:/app/src
     volumes:
       - ${HOST_PROJECT_PATH:-.}:/app
       - ${FEAST_DATA_PATH:-./data/feast}:/app/data/feast
     networks:
       - movie-mlops-network
+    depends_on:
+      - redis
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${FEAST_PORT:-6567}/"]
+      test: ["CMD", "curl", "-f", "http://localhost:${FEAST_PORT:-6567}/health", "||", "curl", "-f", "http://localhost:${FEAST_PORT:-6567}/"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     restart: unless-stopped
     working_dir: /app/feast_repo
-    command: ["feast", "serve", "--host", "0.0.0.0", "--port", "${FEAST_PORT:-6567}"]
 
   # PyTorch - 딥러닝 모델 훈련 서비스
   pytorch-trainer:
@@ -111,7 +149,8 @@ services:
   # API 및 웹 서비스
   # =============================================================================
   
-  # FastAPI - 메인 추천 API
+  # FastAPI - Movie MLOps 메인 추천 API (6번 메뉴용, port 8000)
+  # 주의: Feast는 별도로 port 6567에서 FastAPI feature server를 실행함
   api:
     build:
       context: ${HOST_PROJECT_PATH:-.}
@@ -141,6 +180,8 @@ services:
       timeout: 10s
       retries: 3
     restart: unless-stopped
+    profiles:
+      - api  # API 전용 프로파일 - 7번 메뉴(ML 전용)에서는 실행되지 않음
 
   # =============================================================================
   # 워크플로우 및 스케줄링
@@ -217,7 +258,7 @@ services:
   # 개발 도구
   # =============================================================================
   
-  # Jupyter Lab - 개발 및 실험 환경
+  # Jupyter Lab - ML 개발 및 실험 환경 (ML 전용 스택에 포함, FastAPI와 독립적)
   jupyter:
     build:
       context: ${HOST_PROJECT_PATH:-.}
@@ -230,12 +271,11 @@ services:
       JUPYTER_TOKEN: ${JUPYTER_TOKEN:-movie-mlops-jupyter}
       PYTHONPATH: /app:/app/src
       MLFLOW_TRACKING_URI: http://movie-mlops-mlflow:${MLFLOW_PORT:-5000}
+      FEAST_REPO_PATH: /app/feast_repo
     volumes:
       - ${HOST_PROJECT_PATH:-.}:/app
       - ${JUPYTER_NOTEBOOKS_PATH:-./notebooks}:/app/notebooks
-    depends_on:
-      - mlflow
-      - feast
+    # depends_on 완전 제거 - ML 전용 스택에서 독립적으로 실행
     networks:
       - movie-mlops-network
     profiles:
@@ -245,6 +285,14 @@ services:
       bash -c "
         jupyter lab --ip=0.0.0.0 --port=${JUPYTER_PORT:-8888} --no-browser --allow-root --token=${JUPYTER_TOKEN:-movie-mlops-jupyter}
       "
+
+# =============================================================================
+# 볼륨 정의
+# =============================================================================
+
+volumes:
+  redis_data:
+    driver: local
 
 # =============================================================================
 # 네트워크 (외부 네트워크 사용)
