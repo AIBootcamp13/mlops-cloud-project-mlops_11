@@ -17,26 +17,40 @@ source lib/services/database.sh
 source lib/services/ml.sh
 source lib/services/monitoring.sh
 
-# ===== 번호 2 (start_all_stacks) 함수 - 모듈화된 버전 =====
+# ===== 번호 2 (start_all_stacks) 함수 - 4,5,6,7,8 순차 호출 버전 =====
 start_all_stacks() {
     echo -e "${GREEN}🚀 모든 스택 시작...${NC}"
     
-    # 번호 2의 네트워크 로직 (lib/core/network.sh)
+    # 기본 준비 작업 (기존 2번과 동일)
     ensure_movie_mlops_network
-    
-    # 번호 2의 컨테이너 정리 로직 (lib/core/docker.sh)
     cleanup_all_containers
     
-    # 번호 2의 인프라 스택 로직 (lib/services/database.sh)
-    start_infrastructure_stack
+    # 1단계: 인프라 스택 (4번)
+    echo "🏗️ 4번: 인프라 스택 시작..."
+    start_infrastructure_stack  # 직접 호출로 중복 방지
+    show_infrastructure_urls
     
-    # 번호 2의 ML 스택 로직 (lib/services/ml.sh)
-    start_ml_stack_from_number2
+    # 2단계: API 스택 (5번) - 인프라 위에서 동작
+    echo "💻 5번: API 스택 시작..."
+    start_api_stack_all  # 직접 호출로 중복 방지
+    show_api_urls
     
-    # 번호 2의 모니터링 스택 로직 (lib/services/monitoring.sh)
-    start_monitoring_stack_from_number2
+    # 3단계: ML 스택 (6번) - 인프라 위에서 동작
+    echo "🤖 6번: ML 스택 시작..."
+    start_ml_only_stack_all  # 직접 호출로 중복 방지
+    show_ml_urls
     
-    # 번호 2의 마지막 URL 출력 (lib/ui/messages.sh)
+    # 4단계: 워크플로우 스택 (7번) - 인프라 위에서 동작
+    echo "🔄 7번: 워크플로우 스택 시작..."
+    start_workflow_stack_all  # 직접 호출로 중복 방지
+    show_workflow_urls
+    
+    # 5단계: 모니터링 스택 (8번) - 독립적 동작
+    echo "📊 8번: 모니터링 스택 시작..."
+    start_monitoring_stack_all  # 직접 호출로 중복 방지
+    show_monitoring_urls
+    
+    # 최종 결과 출력 (기존 2번과 동일)
     echo -e "${GREEN}✅ 모든 스택이 시작되었습니다!${NC}"
     show_service_urls
 }
@@ -62,53 +76,75 @@ stop_all_stacks() {
 # ===== 새로운 분리된 스택 함수들 =====
 start_infrastructure() {
     echo -e "${GREEN}🏗️ 인프라 스택 시작...${NC}"
+    
+    # 2번의 네트워크 로직
     ensure_movie_mlops_network
+    
+    # 2번의 인프라 스택 로직 그대로 사용
     start_infrastructure_stack
+    
+    # 2번의 URL 출력
     show_infrastructure_urls
 }
 
 start_api_stack() {
     echo -e "${GREEN}💻 API 스택 시작...${NC}"
+    
+    # 2번의 네트워크 로직
     ensure_movie_mlops_network
     
-    # 인프라 스택이 필요하므로 먼저 시작
+    # 2번에서 API는 인프라 스택 위에서 동작하므로 인프라 먼저 시작
     start_infrastructure_stack
     
-    # API 스택 시작 (번호 2 기반)
-    cleanup_ml_containers  # API 관련 컨테이너 정리
-    start_api_stack_from_number2
+    # 2번의 API 스택 로직 그대로 사용 (ML 스택에서 API 부분만)
+    start_api_stack_all
+    
+    # 2번의 URL 출력
     show_api_urls
 }
 
 start_ml_stack() {
     echo -e "${GREEN}🤖 ML 스택 시작...${NC}"
+    
+    # 2번의 네트워크 로직
     ensure_movie_mlops_network
     
-    # 인프라 스택이 필요하므로 먼저 시작
+    # 2번에서 ML은 인프라 스택 위에서 동작하므로 인프라 먼저 시작
     start_infrastructure_stack
     
-    # ML 전용 스택 시작 (번호 2 기반)
-    cleanup_ml_containers
-    start_ml_only_stack_from_number2
+    # 2번의 ML 전용 스택 로직 그대로 사용 (Feast + MLflow + Jupyter만)
+    start_ml_only_stack_all
+    
+    # 2번의 URL 출력
     show_ml_urls
 }
 
 start_workflow_stack() {
     echo -e "${GREEN}🔄 워크플로우 스택 시작...${NC}"
+    
+    # 2번의 네트워크 로직
     ensure_movie_mlops_network
     
-    # 인프라 스택이 필요하므로 먼저 시작
+    # 2번에서 워크플로우는 인프라 스택 위에서 동작하므로 인프라 먼저 시작
     start_infrastructure_stack
     
-    # 워크플로우 스택 시작 (번호 2 기반)
-    start_workflow_stack_from_number2
+    # 2번의 워크플로우 스택 로직 그대로 사용 (Airflow만)
+    start_workflow_stack_all
+    
+    # 2번의 URL 출력
     show_workflow_urls
 }
 
 start_monitoring_stack() {
     echo -e "${GREEN}📊 모니터링 스택 시작...${NC}"
+    
+    # 2번의 네트워크 로직
     ensure_movie_mlops_network
-    start_monitoring_stack_from_number2
+    
+    # 2번의 모니터링 스택 로직 그대로 사용
+    start_monitoring_stack_all
+    
+    # 2번의 URL 출력
     show_monitoring_urls
 }
 
@@ -117,7 +153,7 @@ start_dev_environment() {
     echo -e "${GREEN}🚀 개발 환경 시작...${NC}"
     ensure_movie_mlops_network
     start_infrastructure_stack
-    start_api_stack_from_number2
+    start_api_stack_all
     echo -e "${GREEN}✅ 개발 환경 준비 완료!${NC}"
     show_api_urls
 }
@@ -126,8 +162,8 @@ start_workflow_environment() {
     echo -e "${GREEN}🚀 워크플로우 환경 시작...${NC}"
     ensure_movie_mlops_network
     start_infrastructure_stack
-    start_api_stack_from_number2
-    start_workflow_stack_from_number2
+    start_api_stack_all
+    start_workflow_stack_all
     echo -e "${GREEN}✅ 워크플로우 환경 준비 완료!${NC}"
     show_api_urls
     show_workflow_urls
@@ -137,9 +173,9 @@ start_ml_dev_environment() {
     echo -e "${GREEN}🚀 ML 개발 환경 시작...${NC}"
     ensure_movie_mlops_network
     start_infrastructure_stack
-    start_api_stack_from_number2
-    start_ml_only_stack_from_number2
-    start_workflow_stack_from_number2
+    start_api_stack_all
+    start_ml_only_stack_all
+    start_workflow_stack_all
     echo -e "${GREEN}✅ ML 개발 환경 준비 완료!${NC}"
     show_service_urls
 }
@@ -206,8 +242,8 @@ check_status() {
         echo ""
         echo "서비스 시작 방법:"
         echo "  - 전체 스택: 메뉴에서 2번 선택"
-        echo "  - ML 스택: 메뉴에서 6번 선택"
-        echo "  - 모니터링 스택: 메뉴에서 8번 선택"
+        echo "  - ML 스택: 메뉴에서 7번 선택"
+        echo "  - 모니터링 스택: 메뉴에서 9번 선택"
     fi
 }
 
@@ -331,18 +367,18 @@ main() {
             1) setup_environment ;;
             2) start_all_stacks ;;
             3) stop_all_stacks ;;
-            4) start_infrastructure ;;
-            5) start_api_stack ;;
-            6) start_ml_stack ;;
-            7) start_workflow_stack ;;
-            8) start_monitoring_stack ;;
-            9) start_dev_environment ;;
-            10) start_workflow_environment ;;
-            11) start_ml_dev_environment ;;
-            12) test_full_system ;;
-            13) test_ml_stack ;;
-            14) test_monitoring_stack ;;
-            15) clean_containers ;;
+            4) clean_containers ;;
+            5) start_infrastructure ;;
+            6) start_api_stack ;;
+            7) start_ml_stack ;;
+            8) start_workflow_stack ;;
+            9) start_monitoring_stack ;;
+            10) start_dev_environment ;;
+            11) start_workflow_environment ;;
+            12) start_ml_dev_environment ;;
+            13) test_full_system ;;
+            14) test_ml_stack ;;
+            15) test_monitoring_stack ;;
             0) echo -e "${GREEN}👋 Movie MLOps 개발 환경을 종료합니다.${NC}"; exit 0 ;;
             *) echo -e "${RED}❌ 잘못된 선택입니다. 다시 선택해주세요.${NC}" ;;
         esac
