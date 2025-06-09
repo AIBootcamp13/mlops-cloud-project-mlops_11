@@ -60,7 +60,7 @@ docker compose -f docker/docker-compose.mlflow.yml up -d
 # Airflow
 docker compose -f docker/docker-compose.airflow.yml up -d
 
-# Feast 피처 스토어
+# Feast 피처 스토어 (내장된 FastAPI 서버)
 docker compose -f docker/docker-compose.feast.yml up -d
 
 # PyTorch 추론
@@ -87,7 +87,7 @@ docker compose -f docker/docker-compose.kafka.yml up -d
 | 🚀 FastAPI 문서 | http://localhost:8000/docs | - |
 | 📈 MLflow UI | http://localhost:5000 | - |
 | 🌊 Airflow UI | http://localhost:8080 | admin/admin |
-| 🍃 Feast UI | http://localhost:6566 | - |
+| 🍃 Feast Feature Server (FastAPI) | http://localhost:6567/docs | - |
 | 📊 Grafana | http://localhost:3000 | admin/admin123 |
 | 🔍 Prometheus | http://localhost:9090 | - |
 | 🗄️ pgAdmin | http://localhost:5050 | admin@movie-mlops.local/admin123 |
@@ -134,7 +134,7 @@ movie-mlops/
 #### 1️⃣ 데이터 파이프라인
 - **Airflow**: 워크플로우 오케스트레이션
 - **PostgreSQL**: 메타데이터 및 피처 저장소
-- **Feast**: 실시간 피처 서빙
+- **Feast**: 실시간 피처 서빙 (내장된 FastAPI 서버 사용)
 
 #### 2️⃣ 모델 관리
 - **MLflow**: 실험 추적 및 모델 레지스트리

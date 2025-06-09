@@ -16,7 +16,7 @@ services:
     container_name: movie-mlops-feast
     restart: unless-stopped
     ports:
-      - "${FEAST_PORT:-6566}:6566"
+      - "${FEAST_PORT:-6567}:6567"
     environment:
       # Feast 설정
       - FEAST_REPO_PATH=${FEAST_REPO_PATH:-/app/feast_repo}
@@ -39,6 +39,11 @@ services:
       # 환경 설정
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - DEBUG=${DEBUG:-true}
+      
+      # FastAPI 커스터마이즈 설정
+      - FEAST_SERVER_TITLE=Feast Feature Server (Built-in FastAPI)
+      - FEAST_SERVER_DESCRIPTION=ML Feature Store with FastAPI Integration
+      - FEAST_SERVER_VERSION=1.0.0
     volumes:
       # Feast 리포지토리
       - ./feast_repo:/app/feast_repo
@@ -59,10 +64,10 @@ services:
     command: >
       bash -c "
         feast apply &&
-        feast serve --host 0.0.0.0 --port 6566
+        feast serve --host 0.0.0.0 --port 6567
       "
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6566/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:6567/health"]
       interval: 30s
       timeout: 10s
       retries: 3

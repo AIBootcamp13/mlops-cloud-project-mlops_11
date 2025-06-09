@@ -46,7 +46,12 @@ if [ "$redis_ready" = false ]; then
     echo "계속 진행하지만 온라인 피처 스토어 기능은 제한될 수 있습니다."
 fi
 
-# Feast 서버 시작
-echo "Feast 서버를 시작합니다 (포트: ${FEAST_PORT:-6567})"
+# Feast 서버 시작 (커스텀 타이틀 적용)
+echo "Feast 커스텀 서버를 시작합니다 (포트: ${FEAST_PORT:-6567})"
 echo "접속 URL: http://localhost:${FEAST_PORT:-6567}"
-exec feast serve --host 0.0.0.0 --port ${FEAST_PORT:-6567}
+echo "FastAPI 문서: http://localhost:${FEAST_PORT:-6567}/docs"
+echo "Feast Feature Server는 내장된 FastAPI를 사용합니다"
+echo "커스텀 타이틀: 'Feast Feature Server (Built-in FastAPI)'"
+
+# 커스텀 Feast 서버 실행 (타이틀 수정됨)
+exec python custom_feast_server.py

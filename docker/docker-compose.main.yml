@@ -146,7 +146,7 @@ services:
       - ${HOST_PROJECT_PATH:-.}:/app
       - feast_data:/app/feast_data
     ports:
-      - "${FEAST_PORT:-6566}:6566"
+      - "${FEAST_PORT:-6567}:6567"
     networks:
       - movie-mlops-network
     depends_on:
@@ -154,7 +154,7 @@ services:
     command: >
       bash -c "
         cd /app/feast_repo && 
-        feast serve --host 0.0.0.0 --port 6566
+        feast serve --host 0.0.0.0 --port 6567
       "
 
   # =============================================================================

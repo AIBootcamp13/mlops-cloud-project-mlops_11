@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 
 # FastAPI 앱 초기화
 app = FastAPI(
-    title="Movie MLOps API",
+    title="FastAPI - Movie MLOps API",
     description="영화 추천 MLOps 시스템 - RESTful API 표준 준수",
     version="2.0.0",
     docs_url="/docs",

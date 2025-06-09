@@ -88,7 +88,7 @@ services:
         - FEAST_VERSION=${FEAST_VERSION:-0.40.1}
     container_name: movie-mlops-feast
     ports:
-      - "${FEAST_PORT:-6567}:${FEAST_PORT:-6567}"
+      - "${FEAST_PORT:-6567}:6567"
     environment:
       FEAST_REPO_PATH: ${FEAST_REPO_PATH:-/app/feast_repo}
       FEAST_REGISTRY_PATH: ${FEAST_REGISTRY_PATH:-/app/feast_repo/data/registry.db}
@@ -102,7 +102,7 @@ services:
     depends_on:
       - redis
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${FEAST_PORT:-6567}/health", "||", "curl", "-f", "http://localhost:${FEAST_PORT:-6567}/"]
+      test: ["CMD", "curl", "-f", "http://localhost:6567/health"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -249,7 +249,7 @@ services:
       dockerfile: ./dockerfiles/Dockerfile.feast
     container_name: movie-mlops-feast
     ports:
-      - "6566:6566"
+      - "6567:6567"
     environment:
       FEAST_REDIS_HOST: redis
       FEAST_REDIS_PORT: 6379
@@ -268,7 +268,7 @@ services:
       - redis
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6566/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:6567/health"]
       interval: 30s
       timeout: 10s
       retries: 3
