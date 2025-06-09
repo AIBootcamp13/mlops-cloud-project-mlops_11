@@ -1,60 +1,17 @@
 # ==============================================================================
-# Movie MLOps - Complete ML Stack
+# Movie MLOps - ML Stack (Clean Version)
 # 
 # 포함 서비스:
-# - 인프라: PostgreSQL, Redis
 # - ML 도구: MLflow (실험 추적), Feast (피처 스토어), PyTorch (모델)
 # - API: FastAPI (추천 서비스)
 # - 워크플로우: Airflow (데이터 파이프라인)
 # - 개발: Jupyter Lab
 #
+# 인프라 서비스(PostgreSQL, Redis)는 별도 스택에서 관리
 # 실행: docker compose -f docker/stacks/docker-compose.ml-stack.yml up -d
 # ==============================================================================
 
 services:
-  # =============================================================================
-  # 인프라 서비스
-  # =============================================================================
-  
-  # PostgreSQL - 메인 데이터베이스
-  postgres:
-    image: ${POSTGRES_IMAGE:-postgres:15-alpine}
-    container_name: movie-mlops-postgres
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-movie_mlops}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ../../docker/configs/postgres/init:/docker-entrypoint-initdb.d
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    networks:
-      - movie-mlops-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-movie_mlops}"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
-
-  # Redis - 캐시 및 Feast 온라인 스토어
-  redis:
-    image: ${REDIS_IMAGE:-redis:7-alpine}
-    container_name: movie-mlops-redis
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - movie-mlops-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
-
   # =============================================================================
   # ML 핵심 도구들
   # =============================================================================
@@ -68,9 +25,9 @@ services:
         - MLFLOW_VERSION=${MLFLOW_VERSION:-2.17.2}
     container_name: movie-mlops-mlflow
     ports:
-      - "${MLFLOW_PORT:-5000}:5000"
+      - "${MLFLOW_PORT:-5000}:${MLFLOW_PORT:-5000}"
     environment:
-      MLFLOW_BACKEND_STORE_URI: ${MLFLOW_BACKEND_STORE_URI:-postgresql://postgres:postgres123@postgres:5432/mlflow}
+      MLFLOW_BACKEND_STORE_URI: ${MLFLOW_BACKEND_STORE_URI:-postgresql://postgres:postgres123@movie-mlops-postgres:5432/mlflow}
       MLFLOW_DEFAULT_ARTIFACT_ROOT: ${MLFLOW_DEFAULT_ARTIFACT_ROOT:-file:///app/mlartifacts}
       MLFLOW_SERVE_ARTIFACTS: ${MLFLOW_SERVE_ARTIFACTS:-true}
       PYTHONPATH: /app:/app/src
@@ -78,13 +35,10 @@ services:
       - ${HOST_PROJECT_PATH:-.}:/app
       - ${MLFLOW_ARTIFACTS_PATH:-./data/mlflow/artifacts}:/app/mlartifacts
       - ${LOGS_VOLUME_PATH:-./logs}/mlflow:/app/logs
-    depends_on:
-      postgres:
-        condition: service_healthy
     networks:
       - movie-mlops-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${MLFLOW_PORT:-5000}/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -99,7 +53,7 @@ services:
         - FEAST_VERSION=${FEAST_VERSION:-0.40.1}
     container_name: movie-mlops-feast
     ports:
-      - "${FEAST_PORT:-6566}:6566"
+      - "${FEAST_PORT:-6567}:${FEAST_PORT:-6567}"
     environment:
       FEAST_REPO_PATH: ${FEAST_REPO_PATH:-/app/feast_repo}
       FEAST_REGISTRY_PATH: ${FEAST_REGISTRY_PATH:-/app/feast_repo/data/registry.db}
@@ -107,19 +61,16 @@ services:
     volumes:
       - ${HOST_PROJECT_PATH:-.}:/app
       - ${FEAST_DATA_PATH:-./data/feast}:/app/data/feast
-    depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
     networks:
       - movie-mlops-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6566/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${FEAST_PORT:-6567}/"]
       interval: 30s
       timeout: 10s
       retries: 3
     restart: unless-stopped
+    working_dir: /app/feast_repo
+    command: ["feast", "serve", "--host", "0.0.0.0", "--port", "${FEAST_PORT:-6567}"]
 
   # PyTorch - 딥러닝 모델 훈련 서비스
   pytorch-trainer:
@@ -131,7 +82,7 @@ services:
     container_name: movie-mlops-pytorch
     environment:
       PYTHONPATH: /app:/app/src
-      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_TRACKING_URI: http://movie-mlops-mlflow:${MLFLOW_PORT:-5000}
       PYTORCH_DEVICE: ${PYTORCH_DEVICE:-cpu}
       TORCH_HOME: ${TORCH_HOME:-/app/.torch}
       CUDA_VISIBLE_DEVICES: ${CUDA_VISIBLE_DEVICES:-}
@@ -140,10 +91,8 @@ services:
       - ${MODELS_PATH:-./models}:/app/models
       - ${LOGS_VOLUME_PATH:-./logs}/pytorch:/app/logs
     depends_on:
-      mlflow:
-        condition: service_healthy
-      feast:
-        condition: service_healthy
+      - mlflow
+      - feast
     networks:
       - movie-mlops-network
     # GPU 지원 (사용 가능한 경우)
@@ -169,29 +118,25 @@ services:
       dockerfile: docker/dockerfiles/Dockerfile.api
     container_name: movie-mlops-api
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "${API_PORT:-8000}:${API_PORT:-8000}"
     environment:
       API_HOST: ${API_HOST:-0.0.0.0}
       API_PORT: ${API_PORT:-8000}
       ENVIRONMENT: ${ENVIRONMENT:-development}
       SECRET_KEY: ${SECRET_KEY:-changeme}
       PYTHONPATH: /app:/app/src
-      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_TRACKING_URI: http://movie-mlops-mlflow:${MLFLOW_PORT:-5000}
       FEAST_REPO_PATH: /app/feast_repo
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres123}@postgres:5432/${POSTGRES_DB:-movie_mlops}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres123}@movie-mlops-postgres:5432/${POSTGRES_DB:-movie_mlops}
     volumes:
       - ${HOST_PROJECT_PATH:-.}:/app
     depends_on:
-      postgres:
-        condition: service_healthy
-      mlflow:
-        condition: service_healthy
-      feast:
-        condition: service_healthy
+      - mlflow
+      - feast
     networks:
       - movie-mlops-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${API_PORT:-8000}/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -210,29 +155,26 @@ services:
         - AIRFLOW_VERSION=${AIRFLOW_VERSION:-2.9.3}
     container_name: movie-mlops-airflow-webserver
     ports:
-      - "${AIRFLOW_WEBSERVER_PORT:-8080}:8080"
+      - "${AIRFLOW_WEBSERVER_PORT:-8080}:${AIRFLOW_WEBSERVER_PORT:-8080}"
     environment:
       AIRFLOW__CORE__EXECUTOR: ${AIRFLOW__CORE__EXECUTOR:-LocalExecutor}
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN:-postgresql+psycopg2://airflow:airflow@postgres:5432/airflow}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN:-postgresql+psycopg2://airflow:airflow@movie-mlops-postgres:5432/airflow}
       AIRFLOW__CORE__LOAD_EXAMPLES: ${AIRFLOW__CORE__LOAD_EXAMPLES:-False}
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: ${AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION:-True}
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: ${AIRFLOW__WEBSERVER__EXPOSE_CONFIG:-True}
       AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY:-changeme}
-      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_TRACKING_URI: http://movie-mlops-mlflow:${MLFLOW_PORT:-5000}
       PYTHONPATH: /app:/app/src
     volumes:
       - ${HOST_PROJECT_PATH:-.}:/app
       - ${AIRFLOW_DAGS_PATH:-./airflow/dags}:/opt/airflow/dags
       - ${AIRFLOW_LOGS_PATH:-./logs/airflow}:/opt/airflow/logs
     depends_on:
-      postgres:
-        condition: service_healthy
-      mlflow:
-        condition: service_healthy
+      - mlflow
     networks:
       - movie-mlops-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${AIRFLOW_WEBSERVER_PORT:-8080}/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -241,7 +183,7 @@ services:
       bash -c "
         airflow db init &&
         airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@movie-mlops.com --password admin &&
-        airflow webserver --port 8080
+        airflow webserver --port ${AIRFLOW_WEBSERVER_PORT:-8080}
       "
 
   # Airflow Scheduler - DAG 스케줄러
@@ -254,21 +196,18 @@ services:
     container_name: movie-mlops-airflow-scheduler
     environment:
       AIRFLOW__CORE__EXECUTOR: ${AIRFLOW__CORE__EXECUTOR:-LocalExecutor}
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN:-postgresql+psycopg2://airflow:airflow@postgres:5432/airflow}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: ${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN:-postgresql+psycopg2://airflow:airflow@movie-mlops-postgres:5432/airflow}
       AIRFLOW__CORE__LOAD_EXAMPLES: ${AIRFLOW__CORE__LOAD_EXAMPLES:-False}
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: ${AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION:-True}
       AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY:-changeme}
-      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_TRACKING_URI: http://movie-mlops-mlflow:${MLFLOW_PORT:-5000}
       PYTHONPATH: /app:/app/src
     volumes:
       - ${HOST_PROJECT_PATH:-.}:/app
       - ${AIRFLOW_DAGS_PATH:-./airflow/dags}:/opt/airflow/dags
       - ${AIRFLOW_LOGS_PATH:-./logs/airflow}:/opt/airflow/logs
     depends_on:
-      postgres:
-        condition: service_healthy
-      mlflow:
-        condition: service_healthy
+      - mlflow
     networks:
       - movie-mlops-network
     restart: unless-stopped
@@ -285,20 +224,18 @@ services:
       dockerfile: docker/dockerfiles/Dockerfile.jupyter
     container_name: movie-mlops-jupyter
     ports:
-      - "${JUPYTER_PORT:-8888}:8888"
+      - "${JUPYTER_PORT:-8888}:${JUPYTER_PORT:-8888}"
     environment:
       JUPYTER_ENABLE_LAB: yes
       JUPYTER_TOKEN: ${JUPYTER_TOKEN:-movie-mlops-jupyter}
       PYTHONPATH: /app:/app/src
-      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_TRACKING_URI: http://movie-mlops-mlflow:${MLFLOW_PORT:-5000}
     volumes:
       - ${HOST_PROJECT_PATH:-.}:/app
       - ${JUPYTER_NOTEBOOKS_PATH:-./notebooks}:/app/notebooks
     depends_on:
-      mlflow:
-        condition: service_healthy
-      feast:
-        condition: service_healthy
+      - mlflow
+      - feast
     networks:
       - movie-mlops-network
     profiles:
@@ -306,20 +243,13 @@ services:
     restart: unless-stopped
     command: >
       bash -c "
-        jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --token=${JUPYTER_TOKEN:-movie-mlops-jupyter}
+        jupyter lab --ip=0.0.0.0 --port=${JUPYTER_PORT:-8888} --no-browser --allow-root --token=${JUPYTER_TOKEN:-movie-mlops-jupyter}
       "
 
 # =============================================================================
-# 네트워크 및 볼륨
+# 네트워크 (외부 네트워크 사용)
 # =============================================================================
 
 networks:
   movie-mlops-network:
-    driver: bridge
     external: true
-
-volumes:
-  postgres_data:
-    name: movie-mlops-postgres-data
-  redis_data:
-    name: movie-mlops-redis-data

@@ -55,9 +55,9 @@ USER feastuser
 # 포트 노출
 EXPOSE 6567
 
-# 헬스체크
+# 헬스체크 - Feast는 /health 엔드포인트가 없으므로 메인 포트 확인
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:6567/health || exit 1
+    CMD curl -f http://localhost:6567/ || exit 1
 
-# 컨테이너 시작 시 실행할 명령
+# 컨테이너 시작 시 실행할 명령 (환경변수 사용)
 CMD ["feast", "serve", "--host", "0.0.0.0", "--port", "6567"]

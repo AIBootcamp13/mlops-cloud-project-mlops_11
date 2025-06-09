@@ -373,12 +373,12 @@ main() {
             1) setup_environment ;;
             2) start_all_stacks ;;
             3) stop_all_stacks ;;
-            4) start_infrastructure ;;
-            5) start_api_stack ;;
-            6) start_ml_stack ;;
-            7) start_workflow_stack ;;
-            8) start_monitoring_stack ;;
-            9) clean_containers ;;
+            4) clean_containers ;;
+            5) start_infrastructure ;;
+            6) start_api_stack ;;
+            7) start_ml_stack ;;
+            8) start_workflow_stack ;;
+            9) start_monitoring_stack ;;
             10) start_dev_environment ;;
             11) start_workflow_environment ;;
             12) start_ml_dev_environment ;;
