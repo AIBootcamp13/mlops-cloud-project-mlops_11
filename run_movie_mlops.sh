@@ -1,197 +1,52 @@
 #!/bin/bash
 # ==============================================================================
-# Movie MLOps 메인 실행 스크립트 (리팩토링 버전)
+# Movie MLOps 메인 실행 스크립트 (모듈화 버전)
 # WSL Docker 환경 - 기능별 스택 관리
+# 번호 2 (start_all_stacks) 기반으로 lib 구조 모듈화
 # ==============================================================================
 
 set -e
 
-# 색상 정의
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+# 모듈 로드
+source lib/ui/messages.sh
+source lib/ui/menu.sh
+source lib/core/config.sh
+source lib/core/network.sh
+source lib/core/docker.sh
+source lib/services/database.sh
+source lib/services/ml.sh
+source lib/services/monitoring.sh
 
-# 함수 정의
-print_header() {
-    echo -e "${CYAN}"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "   🎬 Movie MLOps Development Environment"
-    echo "   WSL Docker 기반 기능별 스택 관리"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo -e "${NC}"
-}
-
-print_menu() {
-    echo ""
-    echo -e "${BLUE}🛠️  환경 설정 및 관리${NC}"
-    echo "1) 전체 환경 설정 (최초 1회)"
-    echo "2) 모든 스택 시작 (인프라 + ML + 모니터링)"
-    echo "3) 모든 스택 중지"
-    echo "14) 기존 컨테이너 정리"
-    echo ""
-    echo -e "${BLUE}📦 기능별 스택 관리${NC}"
-    echo "4) 인프라 스택 (PostgreSQL + Redis)"
-    echo "5) API 스택 (FastAPI + Airflow)"  
-    echo "6) ML 스택 (MLflow + Feast + PyTorch + Jupyter)"
-    echo "7) 모니터링 스택 (Prometheus + Grafana + Kafka)"
-    echo ""
-    echo -e "${BLUE}🧪 테스트 및 검증${NC}"
-    echo "8) 전체 시스템 테스트"
-    echo "9) ML 스택 통합 테스트"
-    echo "10) 모니터링 스택 테스트"
-    echo ""
-    echo -e "${BLUE}📊 상태 확인${NC}"
-    echo "11) 서비스 상태 확인"
-    echo "12) 로그 확인"
-    echo "13) 리소스 사용량 확인"
-    echo ""
-    echo "0) 종료"
-    echo ""
-}
-
-check_prerequisites() {
-    # Docker 설치 확인
-    if ! command -v docker &> /dev/null; then
-        echo -e "${RED}❌ Docker가 설치되지 않았습니다.${NC}"
-        exit 1
-    fi
-    
-    # Docker Compose 설치 확인
-    if ! command -v docker &> /dev/null || ! docker compose version &> /dev/null; then
-        echo -e "${RED}❌ Docker Compose V2가 설치되지 않았습니다.${NC}"
-        exit 1
-    fi
-    
-    # WSL 환경 확인
-    if ! grep -q microsoft /proc/version 2>/dev/null; then
-        echo -e "${YELLOW}⚠️  WSL 환경이 아닐 수 있습니다.${NC}"
-    fi
-    
-    # .env 파일 확인
-    if [ ! -f ".env" ]; then
-        echo -e "${YELLOW}⚠️  .env 파일이 없습니다. .env.template에서 복사합니다.${NC}"
-        cp .env.template .env
-    fi
-}
-
-setup_environment() {
-    echo -e "${GREEN}🚀 전체 환경 설정 시작...${NC}"
-    
-    # 네트워크 생성
-    if ! docker network inspect movie-mlops-network >/dev/null 2>&1; then
-        echo "Docker 네트워크 생성 중..."
-        docker network create movie-mlops-network
-        echo "✅ 네트워크 생성 완료"
-    else
-        echo "✅ 네트워크 이미 존재함"
-    fi
-    
-    # 필요한 디렉토리 생성
-    echo "디렉토리 구조 생성 중..."
-    mkdir -p {data,logs,models,notebooks}
-    mkdir -p logs/{airflow,mlflow,api,feast,postgres,redis,kafka,prometheus,grafana}
-    mkdir -p data/{raw,processed,external,mlflow/artifacts,feast}
-    mkdir -p models/{trained,deployed,experiments}
-    
-    echo -e "${GREEN}✅ 환경 설정이 완료되었습니다.${NC}"
-}
-
+# ===== 번호 2 (start_all_stacks) 함수 - 모듈화된 버전 =====
 start_all_stacks() {
     echo -e "${GREEN}🚀 모든 스택 시작...${NC}"
     
-    # 0. 네트워크 확인 및 생성 (먼저 실행)
-    if ! docker network inspect movie-mlops-network >/dev/null 2>&1; then
-        echo "0️⃣ Docker 네트워크 생성 중..."
-        docker network create movie-mlops-network
-        echo "✅ 네트워크 생성 완료"
-    else
-        echo "0️⃣ 네트워크 이미 존재함 - 건너뜀"
-    fi
+    # 번호 2의 네트워크 로직 (lib/core/network.sh)
+    ensure_movie_mlops_network
     
-    # 0-1. 기존 컴테이너 정리 (충돌 방지) - 더 첫저한 정리
-    echo "🧹 기존 컴테이너 정리 중..."
+    # 번호 2의 컨테이너 정리 로직 (lib/core/docker.sh)
+    cleanup_all_containers
     
-    # 모든 스택의 컴테이너 중지 및 제거
-    echo "단계 1: Docker Compose 스택 중지 중..."
-    docker compose -f docker/stacks/docker-compose.monitoring.yml --project-directory . down 2>/dev/null || true
-    docker compose -f docker/stacks/docker-compose.ml-stack.yml --project-directory . --profile development down 2>/dev/null || true
-    docker compose -f docker/docker-compose.redis.yml down 2>/dev/null || true
-    docker compose -f docker/docker-compose.postgres.yml down 2>/dev/null || true
+    # 번호 2의 인프라 스택 로직 (lib/services/database.sh)
+    start_infrastructure_stack
     
-    # 개별 컴테이너 중지 및 제거
-    echo "단계 2: 개별 컴테이너 정리 중..."
-    existing_containers=$(docker ps -aq --filter "name=movie-mlops")
-    if [ ! -z "$existing_containers" ]; then
-        echo "기존 movie-mlops 컴테이너를 중지하고 제거합니다..."
-        docker stop $existing_containers 2>/dev/null || true
-        docker rm $existing_containers 2>/dev/null || true
-        echo "✅ 기존 컴테이너 정리 완료"
-    else
-        echo "✅ 정리할 기존 컴테이너 없음"
-    fi
+    # 번호 2의 ML 스택 로직 (lib/services/ml.sh)
+    start_ml_stack_from_number2
     
-    # 추가로 오펜 컨테이너 정리 (이름 기반)
-    echo "단계 3: 이름 기반 컴테이너 정리 중..."
-    for container in movie-mlops-postgres movie-mlops-redis movie-mlops-pgadmin movie-mlops-redis-commander; do
-        if docker ps -a --format "{{.Names}}" | grep -q "^${container}$"; then
-            echo "제거 중: ${container}"
-            docker stop "${container}" 2>/dev/null || true
-            docker rm "${container}" 2>/dev/null || true
-        fi
-    done
+    # 번호 2의 모니터링 스택 로직 (lib/services/monitoring.sh)
+    start_monitoring_stack_from_number2
     
-    # 1. 인프라 스택
-    echo "1️⃣ 인프라 스택 시작 중..."
-    docker compose -f docker/docker-compose.postgres.yml up -d
-    docker compose -f docker/docker-compose.redis.yml up -d
-    
-    # 잠시 대기
-    echo "인프라 서비스 안정화 대기 중... (15초)"
-    sleep 15
-    
-    # 2. ML 스택 (인프라 의존성 없는 서비스만)
-    echo "2️⃣ ML 스택 시작 중..."
-    
-    # Feast 서버 개별 실행 (안정적 실행을 위해)
-    echo "Feast 서버 시작 중..."
-    docker run -d \
-      --name movie-mlops-feast-new \
-      --network movie-mlops-network \
-      -p 6567:6567 \
-      -v /mnt/c/dev/movie-mlops:/app \
-      movie-mlops-feast \
-      feast serve --host 0.0.0.0 --port 6567
-    
-    # 잠시 대기 (Feast 초기화 시간)
-    echo "Feast 서비스 안정화 대기 중... (5초)"
-    sleep 5
-    
-    # 나머지 ML 서비스들 (MLflow, FastAPI, Jupyter 등) - Feast 제외
-    echo "나머지 ML 서비스 시작 중..."
-    if [ -f "docker/stacks/docker-compose.ml-stack-fixed.yml" ]; then
-        echo "수정된 ML 스택에서 FastAPI, MLflow, Jupyter, Airflow 시작..."
-        docker compose -f docker/stacks/docker-compose.ml-stack-fixed.yml --project-directory . --profile development up -d api mlflow jupyter airflow-webserver airflow-scheduler
-    else
-        echo "기본 ML 스택에서 FastAPI, MLflow, Jupyter, Airflow 시작..."
-        docker compose -f docker/stacks/docker-compose.ml-stack.yml --project-directory . --profile development up -d api mlflow jupyter airflow-webserver airflow-scheduler
-    fi
-    
-    # 3. 모니터링 스택
-    echo "3️⃣ 모니터링 스택 시작 중..."
-    docker compose -f docker/stacks/docker-compose.monitoring.yml --project-directory . up -d
-    
+    # 번호 2의 마지막 URL 출력 (lib/ui/messages.sh)
     echo -e "${GREEN}✅ 모든 스택이 시작되었습니다!${NC}"
     show_service_urls
 }
 
+# ===== 기존 함수들 (일부는 모듈 함수 호출로 변경) =====
 stop_all_stacks() {
     echo -e "${RED}🛑 모든 스택 중지...${NC}"
     
     # 역순으로 중지
-    docker compose -f docker/stacks/docker-compose.monitoring.yml --project-directory . down 2>/dev/null || true
+    stop_monitoring_stack
     
     # ML 스택 중지 (수정된 버전 우선 시도)
     if [ -f "docker/stacks/docker-compose.ml-stack-fixed.yml" ]; then
@@ -199,116 +54,97 @@ stop_all_stacks() {
     fi
     docker compose -f docker/stacks/docker-compose.ml-stack.yml --project-directory . down 2>/dev/null || true
     
-    docker compose -f docker/docker-compose.redis.yml down 2>/dev/null || true
-    docker compose -f docker/docker-compose.postgres.yml down 2>/dev/null || true
+    stop_infrastructure_stack
     
     echo -e "${GREEN}✅ 모든 스택이 중지되었습니다.${NC}"
 }
 
+# ===== 새로운 분리된 스택 함수들 =====
 start_infrastructure() {
     echo -e "${GREEN}🏗️ 인프라 스택 시작...${NC}"
-    
-    # 네트워크 확인 및 생성
-    if ! docker network inspect movie-mlops-network >/dev/null 2>&1; then
-        echo "네트워크 생성 중..."
-        docker network create movie-mlops-network
-        echo "✅ 네트워크 생성 완료"
-    fi
-    
-    docker compose -f docker/docker-compose.postgres.yml up -d
-    docker compose -f docker/docker-compose.redis.yml up -d
-    echo -e "${GREEN}✅ 인프라 스택이 시작되었습니다.${NC}"
-    echo "🔹 PostgreSQL: localhost:5432"
-    echo "🔹 Redis: localhost:6379"
+    ensure_movie_mlops_network
+    start_infrastructure_stack
+    show_infrastructure_urls
 }
 
 start_api_stack() {
     echo -e "${GREEN}💻 API 스택 시작...${NC}"
+    ensure_movie_mlops_network
     
-    # 네트워크 확인 및 생성
-    if ! docker network inspect movie-mlops-network >/dev/null 2>&1; then
-        echo "네트워크 생성 중..."
-        docker network create movie-mlops-network
-        echo "✅ 네트워크 생성 완료"
-    fi
+    # 인프라 스택이 필요하므로 먼저 시작
+    start_infrastructure_stack
     
-    docker compose -f docker/docker-compose.api.yml up -d
-    docker compose -f docker/docker-compose.airflow.yml up -d
-    echo -e "${GREEN}✅ API 스택이 시작되었습니다.${NC}"
-    echo "🔹 FastAPI: http://localhost:8000/docs"
-    echo "🔹 Airflow: http://localhost:8080 (admin/admin)"
+    # API 스택 시작 (번호 2 기반)
+    cleanup_ml_containers  # API 관련 컨테이너 정리
+    start_api_stack_from_number2
+    show_api_urls
 }
 
 start_ml_stack() {
     echo -e "${GREEN}🤖 ML 스택 시작...${NC}"
+    ensure_movie_mlops_network
     
-    # 네트워크 확인 및 생성
-    if ! docker network inspect movie-mlops-network >/dev/null 2>&1; then
-        echo "네트워크 생성 중..."
-        docker network create movie-mlops-network
-        echo "✅ 네트워크 생성 완료"
-    fi
+    # 인프라 스택이 필요하므로 먼저 시작
+    start_infrastructure_stack
     
-    # 기존 관련 컨테이너 정리
-    echo "기존 ML 컨테이너 정리 중..."
-    containers_to_clean=("movie-mlops-feast" "movie-mlops-feast-new")
-    for container in "${containers_to_clean[@]}"; do
-        if docker ps -a --format "{{.Names}}" | grep -q "^${container}$"; then
-            docker stop "${container}" 2>/dev/null || true
-            docker rm "${container}" 2>/dev/null || true
-        fi
-    done
+    # ML 전용 스택 시작 (번호 2 기반)
+    cleanup_ml_containers
+    start_ml_only_stack_from_number2
+    show_ml_urls
+}
+
+start_workflow_stack() {
+    echo -e "${GREEN}🔄 워크플로우 스택 시작...${NC}"
+    ensure_movie_mlops_network
     
-    # Feast 서버 개별 실행 (안정적 실행을 위해)
-    echo "Feast 서버 시작 중..."
-    docker run -d \
-      --name movie-mlops-feast-new \
-      --network movie-mlops-network \
-      -p 6567:6567 \
-      -v /mnt/c/dev/movie-mlops:/app \
-      movie-mlops-feast \
-      feast serve --host 0.0.0.0 --port 6567
+    # 인프라 스택이 필요하므로 먼저 시작
+    start_infrastructure_stack
     
-    # 잠시 대기 (Feast 초기화 시간)
-    echo "Feast 서비스 안정화 대기 중... (5초)"
-    sleep 5
-    
-    # 나머지 ML 서비스들 (FastAPI, MLflow, Jupyter 등) - Feast 제외
-    echo "나머지 ML 서비스 시작 중..."
-    if [ -f "docker/stacks/docker-compose.ml-stack-fixed.yml" ]; then
-        echo "수정된 ML 스택에서 FastAPI, MLflow, Jupyter, Airflow 시작..."
-        docker compose -f docker/stacks/docker-compose.ml-stack-fixed.yml --project-directory . --profile development up -d api mlflow jupyter airflow-webserver airflow-scheduler
-    else
-        echo "기본 ML 스택에서 FastAPI, MLflow, Jupyter, Airflow 시작..."
-        docker compose -f docker/stacks/docker-compose.ml-stack.yml --project-directory . --profile development up -d api mlflow jupyter airflow-webserver airflow-scheduler
-    fi
-    
-    echo -e "${GREEN}✅ ML 스택이 시작되었습니다.${NC}"
-    echo "🔹 MLflow: http://localhost:5000"
-    echo "🔹 Feast: http://localhost:6567/docs"
-    echo "🔹 Jupyter: http://localhost:8888"
-    echo "🔹 FastAPI: http://localhost:8000/docs"
-    echo "🔹 Airflow: http://localhost:8080"
+    # 워크플로우 스택 시작 (번호 2 기반)
+    start_workflow_stack_from_number2
+    show_workflow_urls
 }
 
 start_monitoring_stack() {
     echo -e "${GREEN}📊 모니터링 스택 시작...${NC}"
-    
-    # 네트워크 확인 및 생성
-    if ! docker network inspect movie-mlops-network >/dev/null 2>&1; then
-        echo "네트워크 생성 중..."
-        docker network create movie-mlops-network
-        echo "✅ 네트워크 생성 완료"
-    fi
-    
-    docker compose -f docker/stacks/docker-compose.monitoring.yml --project-directory . up -d
-    echo -e "${GREEN}✅ 모니터링 스택이 시작되었습니다.${NC}"
-    echo "🔹 Prometheus: http://localhost:9090"
-    echo "🔹 Grafana: http://localhost:3000 (admin/admin123)"
-    echo "🔹 Kafka UI: http://localhost:8082"
-    echo "🔹 AlertManager: http://localhost:9093"
+    ensure_movie_mlops_network
+    start_monitoring_stack_from_number2
+    show_monitoring_urls
 }
 
+# ===== 통합 환경 함수들 =====
+start_dev_environment() {
+    echo -e "${GREEN}🚀 개발 환경 시작...${NC}"
+    ensure_movie_mlops_network
+    start_infrastructure_stack
+    start_api_stack_from_number2
+    echo -e "${GREEN}✅ 개발 환경 준비 완료!${NC}"
+    show_api_urls
+}
+
+start_workflow_environment() {
+    echo -e "${GREEN}🚀 워크플로우 환경 시작...${NC}"
+    ensure_movie_mlops_network
+    start_infrastructure_stack
+    start_api_stack_from_number2
+    start_workflow_stack_from_number2
+    echo -e "${GREEN}✅ 워크플로우 환경 준비 완료!${NC}"
+    show_api_urls
+    show_workflow_urls
+}
+
+start_ml_dev_environment() {
+    echo -e "${GREEN}🚀 ML 개발 환경 시작...${NC}"
+    ensure_movie_mlops_network
+    start_infrastructure_stack
+    start_api_stack_from_number2
+    start_ml_only_stack_from_number2
+    start_workflow_stack_from_number2
+    echo -e "${GREEN}✅ ML 개발 환경 준비 완료!${NC}"
+    show_service_urls
+}
+
+# ===== 기존 테스트 및 상태 확인 함수들 (기존과 동일) =====
 test_full_system() {
     echo -e "${GREEN}🧪 전체 시스템 테스트 실행...${NC}"
     
@@ -371,49 +207,12 @@ check_status() {
         echo "서비스 시작 방법:"
         echo "  - 전체 스택: 메뉴에서 2번 선택"
         echo "  - ML 스택: 메뉴에서 6번 선택"
-        echo "  - 모니터링 스택: 메뉴에서 7번 선택"
+        echo "  - 모니터링 스택: 메뉴에서 8번 선택"
     fi
 }
 
-show_service_urls() {
-    echo "📊 서비스 접속 정보:"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-    echo "🔹 개발 환경:"
-    echo "   Jupyter Lab: http://localhost:8888"
-    echo "   API 문서: http://localhost:8000/docs"
-    echo ""
-    echo "🔹 ML 도구:"
-    echo "   MLflow UI: http://localhost:5000"
-    echo "   Feast UI: http://localhost:6567/docs"
-    echo ""
-    echo "🔹 워크플로우:"
-    echo "   Airflow UI: http://localhost:8080 (admin/admin)"
-    echo ""
-    echo "🔹 모니터링:"
-    echo "   Grafana: http://localhost:3000 (admin/admin123)"
-    echo "   Prometheus: http://localhost:9090"
-    echo "   Kafka UI: http://localhost:8082"
-    echo "   cAdvisor: http://localhost:8083"
-    echo ""
-    echo "🔹 데이터베이스:"
-    echo "   PostgreSQL: localhost:5432"
-    echo "   Redis: localhost:6379"
-    echo "   Redis Commander: http://localhost:8081"
-}
-
 view_logs() {
-    echo -e "${BLUE}📝 어떤 서비스의 로그를 확인하시겠습니까?${NC}"
-    echo "1) API"
-    echo "2) MLflow"
-    echo "3) Feast"
-    echo "4) Airflow"
-    echo "5) Prometheus"
-    echo "6) Grafana"
-    echo "7) Kafka"
-    echo "8) PostgreSQL"
-    echo "9) Redis"
-    echo "10) 전체 (최근 50줄)"
+    print_log_menu
     read -p "선택 (1-10): " log_choice
     
     case $log_choice in
@@ -526,7 +325,7 @@ main() {
     
     while true; do
         print_menu
-        read -p "선택해주세요 (0-14): " choice
+        read -p "선택해주세요 (0-15): " choice
         
         case $choice in
             1) setup_environment ;;
@@ -535,14 +334,15 @@ main() {
             4) start_infrastructure ;;
             5) start_api_stack ;;
             6) start_ml_stack ;;
-            7) start_monitoring_stack ;;
-            8) test_full_system ;;
-            9) test_ml_stack ;;
-            10) test_monitoring_stack ;;
-            11) check_status ;;
-            12) view_logs ;;
-            13) check_resources ;;
-            14) clean_containers ;;
+            7) start_workflow_stack ;;
+            8) start_monitoring_stack ;;
+            9) start_dev_environment ;;
+            10) start_workflow_environment ;;
+            11) start_ml_dev_environment ;;
+            12) test_full_system ;;
+            13) test_ml_stack ;;
+            14) test_monitoring_stack ;;
+            15) clean_containers ;;
             0) echo -e "${GREEN}👋 Movie MLOps 개발 환경을 종료합니다.${NC}"; exit 0 ;;
             *) echo -e "${RED}❌ 잘못된 선택입니다. 다시 선택해주세요.${NC}" ;;
         esac
