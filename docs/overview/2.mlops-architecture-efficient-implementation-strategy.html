@@ -52,19 +52,77 @@
             width: 100%;
             border-collapse: collapse;
             margin: 20px 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
         }
         .architecture-table th,
         .architecture-table td {
-            border: 1px solid #ddd;
-            padding: 12px;
+            border: none;
+            padding: 16px;
             text-align: left;
+            vertical-align: top;
         }
         .architecture-table th {
-            background-color: #3498db;
+            background: linear-gradient(135deg, #4a90e2, #5ba0f2);
             color: white;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .architecture-table tr {
+            border-bottom: 1px solid #e8ecf0;
+        }
+        .architecture-table tr:nth-child(odd) {
+            background-color: #ffffff;
         }
         .architecture-table tr:nth-child(even) {
-            background-color: #f2f2f2;
+            background-color: #f8fafc;
+        }
+        /* 특별한 아키텍처들 (6-9) 하이라이트 */
+        .architecture-table tr:nth-child(n+7) {
+            background: linear-gradient(135deg, #fff9e6, #fef3d4);
+            border-left: 4px solid #f39c12;
+        }
+        .architecture-table tr:nth-child(n+7):nth-child(even) {
+            background: linear-gradient(135deg, #fff7e0, #fef0c7);
+        }
+        
+        /* 도구 태그 스타일 */
+        .tool-tag {
+            display: inline-block;
+            background: linear-gradient(135deg, #6c7ce7, #a55eea);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 500;
+            margin: 2px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* 아키텍처명 스타일 */
+        .arch-name {
+            font-weight: 600;
+            color: #2c3e50;
+            line-height: 1.4;
+        }
+        
+        /* 아키텍처 번호 스타일 */
+        .arch-number {
+            font-weight: bold;
+            color: #3498db;
+        }
+        
+        /* 역할 태그 스타일 */
+        .role-tag {
+            display: inline-block;
+            background: linear-gradient(135deg, #55a3ff, #4285f4);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 500;
         }
         .group-box {
             background: #e8f4fd;
@@ -147,55 +205,65 @@
             <thead>
                 <tr>
                     <th>아키텍처</th>
+                    <th>아키텍처명</th>
                     <th>핵심 도구</th>
                     <th>역할</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
-                    <td>1아키텍처</td>
-                    <td>Apache Airflow</td>
-                    <td>데이터 파이프라인</td>
+                    <td><span class="arch-number">1아키텍처</span></td>
+                    <td><span class="arch-name">Data pipeline</span></td>
+                    <td><span class="tool-tag">Apache Airflow</span></td>
+                    <td><span class="role-tag">데이터 파이프라인</span></td>
                 </tr>
                 <tr>
-                    <td>2아키텍처</td>
-                    <td>Feast</td>
-                    <td>피처 스토어</td>
+                    <td><span class="arch-number">2아키텍처</span></td>
+                    <td><span class="arch-name">Feature store</span></td>
+                    <td><span class="tool-tag">Feast</span></td>
+                    <td><span class="role-tag">피처 스토어</span></td>
                 </tr>
                 <tr>
-                    <td>3아키텍처</td>
-                    <td>Git + GitHub</td>
-                    <td>버전 관리</td>
+                    <td><span class="arch-number">3아키텍처</span></td>
+                    <td><span class="arch-name">Source repository</span></td>
+                    <td><span class="tool-tag">Git</span> <span class="tool-tag">GitHub</span></td>
+                    <td><span class="role-tag">버전 관리</span></td>
                 </tr>
                 <tr>
-                    <td>4아키텍처</td>
-                    <td>GitHub Actions</td>
-                    <td>CI/CD</td>
+                    <td><span class="arch-number">4아키텍처</span></td>
+                    <td><span class="arch-name">CI: Build, test & package<br/>pipeline components / packages<br/>CD: Pipeline deployment</span></td>
+                    <td><span class="tool-tag">GitHub Actions</span></td>
+                    <td><span class="role-tag">CI/CD</span></td>
                 </tr>
                 <tr>
-                    <td>5아키텍처</td>
-                    <td>Apache Airflow</td>
-                    <td>워크플로우 오케스트레이션</td>
+                    <td><span class="arch-number">5아키텍처</span></td>
+                    <td><span class="arch-name">Data extraction /<br/>Data validation /<br/>Data preparation /<br/>Model training /<br/>Model validation /<br/>Model evaluation</span></td>
+                    <td><span class="tool-tag">Apache Airflow</span></td>
+                    <td><span class="role-tag">워크플로우 오케스트레이션</span></td>
                 </tr>
                 <tr>
-                    <td>6아키텍처</td>
-                    <td>MLflow Registry</td>
-                    <td>모델 레지스트리</td>
+                    <td><span class="arch-number">6아키텍처</span></td>
+                    <td><span class="arch-name">🔸 Model registry</span></td>
+                    <td><span class="tool-tag">MLflow Registry</span></td>
+                    <td><span class="role-tag">모델 레지스트리</span></td>
                 </tr>
                 <tr>
-                    <td>7아키텍처</td>
-                    <td>PyTorch</td>
-                    <td>ML 프레임워크</td>
+                    <td><span class="arch-number">7아키텍처</span></td>
+                    <td><span class="arch-name">🔸 CD: Model serving</span></td>
+                    <td><span class="tool-tag">PyTorch</span></td>
+                    <td><span class="role-tag">ML 프레임워크</span></td>
                 </tr>
                 <tr>
-                    <td>8아키텍처</td>
-                    <td>Prometheus + Grafana</td>
-                    <td>모니터링</td>
+                    <td><span class="arch-number">8아키텍처</span></td>
+                    <td><span class="arch-name">🔸 Performance monitoring</span></td>
+                    <td><span class="tool-tag">Prometheus</span> <span class="tool-tag">Grafana</span></td>
+                    <td><span class="role-tag">모니터링</span></td>
                 </tr>
                 <tr>
-                    <td>9아키텍처</td>
-                    <td>Apache Kafka</td>
-                    <td>이벤트 기반</td>
+                    <td><span class="arch-number">9아키텍처</span></td>
+                    <td><span class="arch-name">🔸 Trigger</span></td>
+                    <td><span class="tool-tag">Apache Kafka</span></td>
+                    <td><span class="role-tag">이벤트 기반</span></td>
                 </tr>
             </tbody>
         </table>
