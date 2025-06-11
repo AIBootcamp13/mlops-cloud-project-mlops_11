@@ -2,7 +2,7 @@
 
 > **IMDb 영화 평점 예측을 위한 프로덕션 수준의 MLOps 파이프라인 - Random Forest 모델과 포괄적인 모니터링, CI/CD, 컨테이너화 구현**
 
-[![Build Status](https://github.com/Wchoi189/mlops-cloud-project-mlops_11/actions/workflows/ci-cd-pipeline.yml/badge.svg)](https://github.com/Wchoi189/mlops-cloud-project-mlops_11/actions)
+[![Build Status](https://github.com/AIBootcamp13/mlops-cloud-project-mlops_11/actions/workflows/ci-cd-pipeline.yml/badge.svg)](https://github.com/AIBootcamp13/mlops-cloud-project-mlops_11/actions)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue?logo=docker)](./docker/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.85+-green?logo=fastapi)](https://fastapi.tiangolo.com/)
 [![MLflow](https://img.shields.io/badge/MLflow-2.0+-orange?logo=mlflow)](https://mlflow.org/)
